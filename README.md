@@ -60,31 +60,14 @@ com.google.android.gms!
 
 ## Customize security patch level 
 
-Create the file `/data/adb/tricky_store/devconfig.toml`.
+Edit the file `/data/adb/tricky_store/devconfig.toml`.
 
-Simple:
-
-```
-# Hack os/vendor/boot security patch level
-20241101
-```
-
-Advanced:
+For example:
 
 ```
-# os security patch level is 202411
-system=202411
-# do not hack boot patch level
-boot=no
-# vendor patch level is 20241101 (another format)
-vendor=2024-11-01
-# default value
-# all=20241101
-# keep consistent with system prop
-# system=prop
+securityPatch = "2024-04-05"
+osVersion = 34
 ```
-
-Note: this feature will only hack the result of KeyAttestation, it will not do resetprop, you need do it yourself.
 
 ## TODO
 
