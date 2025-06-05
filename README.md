@@ -1,6 +1,6 @@
 # Tricky Store (Fork)
 
-A trick of keystore. **Android 12 or above is required**.
+A trick of keystore. **Android 10 or above is required**.
 
 ## Feature
 
@@ -57,6 +57,34 @@ io.github.vvb2060.keyattestation
 # use certificate generating mode for gms
 com.google.android.gms!
 ```
+
+## Customize security patch level 
+
+Create the file `/data/adb/tricky_store/devconfig.toml`.
+
+Simple:
+
+```
+# Hack os/vendor/boot security patch level
+20241101
+```
+
+Advanced:
+
+```
+# os security patch level is 202411
+system=202411
+# do not hack boot patch level
+boot=no
+# vendor patch level is 20241101 (another format)
+vendor=2024-11-01
+# default value
+# all=20241101
+# keep consistent with system prop
+# system=prop
+```
+
+Note: this feature will only hack the result of KeyAttestation, it will not do resetprop, you need do it yourself.
 
 ## TODO
 
