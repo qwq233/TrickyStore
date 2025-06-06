@@ -60,7 +60,7 @@ com.google.android.gms!
 
 ## Customize security patch level 
 
-Edit the file `/data/adb/tricky_store/devconfig.toml`.
+Edit the file `/data/adb/tricky_store/security_patch.txt`.
 
 For example:
 
