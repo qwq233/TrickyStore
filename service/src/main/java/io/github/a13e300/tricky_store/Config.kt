@@ -42,7 +42,7 @@ object Config {
     private const val CONFIG_PATH = "/data/adb/tricky_store"
     private const val TARGET_FILE = "target.txt"
     private const val KEYBOX_FILE = "keybox.xml"
-    private const val DEV_CONFIG_FILE = "devconfig.toml"
+    private const val SECURITY_PATCH_FILE = "security_patch.txt"
     private val root = File(CONFIG_PATH)
 
     object ConfigObserver : FileObserver(root, CLOSE_WRITE or DELETE or MOVED_FROM or MOVED_TO) {
@@ -56,7 +56,7 @@ object Config {
             when (path) {
                 TARGET_FILE -> updateTargetPackages(f)
                 KEYBOX_FILE -> updateKeyBox(f)
-                DEV_CONFIG_FILE -> parseDevConfig(f)
+                SECURITY_PATCH_FILE -> parseDevConfig(f)
             }
         }
     }
@@ -76,7 +76,7 @@ object Config {
             updateKeyBox(keybox)
         }
 
-        val fDevConfig = File(root, DEV_CONFIG_FILE)
+        val fDevConfig = File(root, SECURITY_PATCH_FILE)
         if (!fDevConfig.exists()) {
             fDevConfig.createNewFile()
             fDevConfig.writeText(Toml.encodeToString(devConfig))
