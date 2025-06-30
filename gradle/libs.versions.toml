@@ -10,7 +10,7 @@ kotlinxCoroutinesAndroid = "1.10.2"
 [libraries]
 annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
 bcpkix-jdk18on = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bcpkix-jdk18on" }
-cxx = { module = "org.lsposed.libcxx:libcxx", version = "27.0.12077973" }
+cxx = { module = "org.lsposed.libcxx:libcxx", version = "28.1.13356709" }
 ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
 ktoml-file = { module = "com.akuleshov7:ktoml-file", version.ref = "ktoml" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
