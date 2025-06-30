@@ -561,8 +561,8 @@ public final class CertHack {
             var AosPatchLevel = new ASN1Integer(UtilKt.getPatchLevel());
 
             var AapplicationID = createApplicationId(uid);
-            var AbootPatchlevel = new ASN1Integer(UtilKt.getPatchLevelLong());
-            var AvendorPatchLevel = new ASN1Integer(UtilKt.getPatchLevelLong());
+            var AbootPatchlevel = new ASN1Integer(UtilKt.getBootPatchLevelLong());
+            var AvendorPatchLevel = new ASN1Integer(UtilKt.getVendorPatchLevelLong());
 
             var AcreationDateTime = new ASN1Integer(System.currentTimeMillis());
             var Aorigin = new ASN1Integer(0);

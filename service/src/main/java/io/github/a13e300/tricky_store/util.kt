@@ -11,6 +11,7 @@ import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.asn1.DERSequence
 import org.bouncycastle.asn1.DERTaggedObject
+import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.ThreadLocalRandom
 
@@ -37,15 +38,94 @@ fun getBootHashFromProp(): ByteArray? {
 
 fun randomBytes() = ByteArray(32).also { ThreadLocalRandom.current().nextBytes(it) }
 
+// Data class for security_patch.txt
+private data class CustomPatchLevel(
+    val system: String? = null,
+    val vendor: String? = null,
+    val boot: String? = null,
+    val all: String? = null
+)
+
+private val customPatchLevel: CustomPatchLevel? by lazy {
+    val file = File("/data/adb/tricky_store/security_patch.txt")
+    if (!file.exists()) return@lazy null
+    val lines = file.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+    if (lines.isEmpty()) return@lazy null
+    // Simple mode: first line is a patch level
+    if (lines.size == 1 && !lines[0].contains("=")) {
+        return@lazy CustomPatchLevel(all = lines[0])
+    }
+    // Advanced mode: parse key=value pairs
+    val map = mutableMapOf<String, String>()
+    for (line in lines) {
+        val idx = line.indexOf('=')
+        if (idx > 0) {
+            val key = line.substring(0, idx).trim().lowercase()
+            val value = line.substring(idx + 1).trim()
+            map[key] = value
+        }
+    }
+    // If all is set, use it as default for system, vendor, boot if not set
+    val all = map["all"]
+    CustomPatchLevel(
+        system = map["system"] ?: all,
+        vendor = map["vendor"] ?: all,
+        boot = map["boot"] ?: all,
+        all = all
+    )
+}
+
+private fun getCustomPatchLevel(key: String, long: Boolean): Int? {
+    val cpl = customPatchLevel ?: return null
+    val value = when (key) {
+        "system" -> cpl.system ?: cpl.all
+        "vendor" -> cpl.vendor ?: cpl.all
+        "boot" -> cpl.boot ?: cpl.all
+        else -> cpl.all
+    } ?: return null
+    if (value.equals("no", ignoreCase = true)) return null
+    if (value.equals("prop", ignoreCase = true)) return null
+    // Accept both 20250301 and 2025-03-01
+    val normalized = value.replace("-", "")
+    return try {
+        if (long) {
+            if (normalized.length == 8) normalized.substring(0, 4).toInt() * 10000 + normalized.substring(4, 6).toInt() * 100 + normalized.substring(6, 8).toInt()
+            else if (normalized.length == 6) normalized.substring(0, 4).toInt() * 10000 + normalized.substring(4, 6).toInt() * 100
+            else null
+        } else {
+            if (normalized.length == 8) normalized.substring(0, 4).toInt() * 100 + normalized.substring(4, 6).toInt()
+            else if (normalized.length == 6) normalized.substring(0, 4).toInt() * 100 + normalized.substring(4, 6).toInt()
+            else null
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+// Fallback to devconfig.toml if security_patch.txt fails
 val patchLevel
-    get() = runCatching {
-        Config.devConfig.securityPatch.convertPatchLevel(false)
-    }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
+    get() = getCustomPatchLevel("system", false)
+        ?: runCatching { Config.devConfig.securityPatch.convertPatchLevel(false) }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
 
 val patchLevelLong
-    get() = runCatching {
-        Config.devConfig.securityPatch.convertPatchLevel(true)
-    }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
+    get() = getCustomPatchLevel("system", true)
+        ?: runCatching { Config.devConfig.securityPatch.convertPatchLevel(true) }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
+
+val vendorPatchLevel: Int
+    get() = getCustomPatchLevel("vendor", false)
+        ?: runCatching { Config.devConfig.securityPatch.convertPatchLevel(false) }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
+
+val vendorPatchLevelLong: Int
+    get() = getCustomPatchLevel("vendor", true)
+        ?: runCatching { Config.devConfig.securityPatch.convertPatchLevel(true) }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(true))
+
+val bootPatchLevel: Int
+    get() = getCustomPatchLevel("boot", false)
+        ?: runCatching { Config.devConfig.securityPatch.convertPatchLevel(false) }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
+
+val bootPatchLevelLong: Int
+    get() = getCustomPatchLevel("boot", true)
+        ?: runCatching { Config.devConfig.securityPatch.convertPatchLevel(true) }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(true))
 
 val osVersion
     get() = Config.devConfig.osVersion.run {
