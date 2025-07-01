@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ServiceManager
 import android.os.SystemProperties
-import android.telephony.TelephonyManager
 import org.bouncycastle.asn1.ASN1Encodable
 import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.DEROctetString
@@ -107,11 +106,22 @@ val moduleHash: ByteArray by lazy {
 @Suppress("MissingPermission")
 val telephonyInfos by lazy {
     mutableListOf<DERTaggedObject>().apply {
-        add(DERTaggedObject(true, 714, (DEROctetString(SystemProperties.get("ro.ril.oem.imei", null)?.toByteArray()))))
-        add(DERTaggedObject(true, 715, DEROctetString(SystemProperties.get("ro.ril.oem.meid", null)?.toByteArray())))
-        add(DERTaggedObject(true, 723, DEROctetString(SystemProperties.get("ro.ril.oem.imei2", null)?.toByteArray())))
-        add(DERTaggedObject(true, 713, DEROctetString(SystemProperties.get("ro.serialno", null)?.toByteArray())))
+        Config.devConfig.deviceProps.also {
+            add(it.imei.toDER().toTaggedObj(714))
+            add(it.meid.toDER().toTaggedObj(715))
+            add(it.imei2.toDER().toTaggedObj(723))
+            add(it.serial.toDER().toTaggedObj(713))
+
+            add(it.brand.toDER().toTaggedObj(710))
+            add(it.device.toDER().toTaggedObj(711))
+            add(it.product.toDER().toTaggedObj(712))
+            add(it.manufacturer.toDER().toTaggedObj(716))
+            add(it.model.toDER().toTaggedObj(717))
+        }
     }.toList()
 }
 
+fun String.toDER() = DEROctetString(this.toByteArray())
+
+fun DEROctetString.toTaggedObj(tag: Int, explicit: Boolean = true) = DERTaggedObject(explicit, tag, this)
 fun String.trimLine() = trim().split("\n").joinToString("\n") { it.trim() }

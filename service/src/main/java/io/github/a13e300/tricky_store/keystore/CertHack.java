@@ -148,7 +148,7 @@ public final class CertHack {
                     certificateChain.add(parseCert(certData.get("text")));
                 }
                 String algo;
-                if (keyboxAlgorithm.toLowerCase().equals("ecdsa")) {
+                if (keyboxAlgorithm.equalsIgnoreCase("ecdsa")) {
                     algo = KeyProperties.KEY_ALGORITHM_EC;
                 } else {
                     algo = KeyProperties.KEY_ALGORITHM_RSA;
@@ -591,19 +591,6 @@ public final class CertHack {
 
             // Support device properties attestation
             if (params.brand != null) {
-                var Abrand = new DEROctetString(params.brand);
-                var Adevice = new DEROctetString(params.device);
-                var Aproduct = new DEROctetString(params.product);
-                var Amanufacturer = new DEROctetString(params.manufacturer);
-                var Amodel = new DEROctetString(params.model);
-
-                var brand = new DERTaggedObject(true, 710, Abrand);
-                var device = new DERTaggedObject(true, 711, Adevice);
-                var product = new DERTaggedObject(true, 712, Aproduct);
-                var manufacturer = new DERTaggedObject(true, 716, Amanufacturer);
-                var model = new DERTaggedObject(true, 717, Amodel);
-
-                arrayList.addAll(List.of(brand, device, product, manufacturer, model));
                 arrayList.addAll(UtilKt.getTelephonyInfos());
             }
 

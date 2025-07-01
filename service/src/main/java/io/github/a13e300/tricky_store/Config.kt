@@ -4,6 +4,7 @@ import android.content.pm.IPackageManager
 import android.os.Build
 import android.os.FileObserver
 import android.os.ServiceManager
+import android.os.SystemProperties
 import com.akuleshov7.ktoml.Toml
 import com.akuleshov7.ktoml.TomlIndentation
 import com.akuleshov7.ktoml.TomlInputConfig
@@ -141,7 +142,22 @@ object Config {
     data class DeviceConfig(
         @TomlComments("YYYY-MM-DD") val securityPatch: String = Build.VERSION.SECURITY_PATCH,
         @TomlComments("SDK Version (i.e.: 35 for Android 15)") val osVersion: Int = Build.VERSION.SDK_INT,
-    )
+        @TomlComments("Remember to override the corresponding system properties when modifying the following values") val deviceProps: DeviceProps = DeviceProps()
+    ) {
+        @Serializable
+        data class DeviceProps(
+            val brand: String = Build.BRAND,
+            val device: String = Build.DEVICE,
+            val product: String = Build.PRODUCT,
+            val manufacturer: String = Build.MANUFACTURER,
+            val model: String = Build.MODEL,
+            val serial: String = SystemProperties.get("ro.serialno", ""),
+
+            val meid: String = SystemProperties.get("ro.ril.oem.imei", ""),
+            val imei: String = SystemProperties.get("ro.ril.oem.meid", ""),
+            val imei2: String = SystemProperties.get("ro.ril.oem.imei2", ""),
+        )
+    }
 
     fun parseDevConfig(f: File?) = runCatching {
         f ?: return@runCatching
