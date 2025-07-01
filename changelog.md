@@ -1,7 +1,7 @@
 # Changes:
 
 - feat: support modify device properties
-  *Remember to override the corresponding system properties when modifying the following values*
+  *Remember to override the corresponding system properties when modifying the its values*
 - feat: add update reminder for root manager
 - chore: bump ndk version to r28b
 - chore: bump gradle version to 8.14.2
