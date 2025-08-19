@@ -72,5 +72,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           git add changelog.md update.json
-          git commit -m "Update v${{ steps.release_info.outputs.tag_name }}"
+          git commit -m "Update ${{ steps.release_info.outputs.tag_name }}"
           git push origin changelog -f
