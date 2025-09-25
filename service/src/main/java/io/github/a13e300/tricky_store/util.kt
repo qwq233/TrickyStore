@@ -38,16 +38,16 @@ fun randomBytes() = ByteArray(32).also { ThreadLocalRandom.current().nextBytes(i
 
 val patchLevel
     get() = runCatching {
-        Config.devConfig.securityPatch.convertPatchLevel(false)
+        Config.devConfig.generalSettings.securityPatch.convertPatchLevel(false)
     }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
 
 val patchLevelLong
     get() = runCatching {
-        Config.devConfig.securityPatch.convertPatchLevel(true)
+        Config.devConfig.generalSettings.securityPatch.convertPatchLevel(true)
     }.getOrDefault(Build.VERSION.SECURITY_PATCH.convertPatchLevel(false))
 
 val osVersion
-    get() = Config.devConfig.osVersion.run {
+    get() = Config.devConfig.generalSettings.osVersion.run {
         if (this > 0) return@run getOsVersion(this)
         else return@run getOsVersion(Build.VERSION.SDK_INT)
     }

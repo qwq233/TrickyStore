@@ -88,14 +88,15 @@ object Config {
     }
 
     private fun resetProp() = CoroutineScope(Dispatchers.IO).async {
+        if (!devConfig.generalSettings.autoResetProps) return@async
         runCatching {
             val p = Runtime.getRuntime().exec(
                 arrayOf(
-                    "su", "-c", "resetprop", "ro.build.version.security_patch", devConfig.securityPatch
+                    "su", "-c", "resetprop", "ro.build.version.security_patch", devConfig.generalSettings.securityPatch
                 )
             )
             if (p.waitFor() == 0) {
-                Logger.d("resetprop security_patch from ${Build.VERSION.SECURITY_PATCH} to ${devConfig.securityPatch}")
+                Logger.d("resetprop security_patch from ${Build.VERSION.SECURITY_PATCH} to ${devConfig.generalSettings.securityPatch}")
             }
         }.onFailure {
             Logger.e("", it)
@@ -140,10 +141,15 @@ object Config {
 
     @Serializable
     data class DeviceConfig(
-        @TomlComments("YYYY-MM-DD") val securityPatch: String = Build.VERSION.SECURITY_PATCH,
-        @TomlComments("SDK Version (i.e.: 35 for Android 15)") val osVersion: Int = Build.VERSION.SDK_INT,
+        @TomlComments("YYYY-MM-DD") val generalSettings: General = General(),
         @TomlComments("Remember to override the corresponding system properties when modifying the following values") val deviceProps: DeviceProps = DeviceProps()
     ) {
+        @Serializable
+        data class General(
+            @TomlComments("YYYY-MM-DD") val securityPatch: String = Build.VERSION.SECURITY_PATCH,
+            @TomlComments("SDK Version (i.e.: 35 for Android 15)") val osVersion: Int = Build.VERSION.SDK_INT,
+            @TomlComments("Auto reset the security patch props on startup") val autoResetProps: Boolean = true,
+        )
         @Serializable
         data class DeviceProps(
             val brand: String = Build.BRAND,
