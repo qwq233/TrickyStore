@@ -141,7 +141,7 @@ object Config {
 
     @Serializable
     data class DeviceConfig(
-        @TomlComments("YYYY-MM-DD") val generalSettings: General = General(),
+        val generalSettings: General = General(),
         @TomlComments("Remember to override the corresponding system properties when modifying the following values") val deviceProps: DeviceProps = DeviceProps()
     ) {
         @Serializable
