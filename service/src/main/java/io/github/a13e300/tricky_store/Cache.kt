@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap
 object Cache {
     data class Owner(val uid: Int, val pid: Int)
 
+    // These imported keys will be naturally dropped when app exits and pid changes
     private val importedKeys = ConcurrentHashMap<Owner, Pair<Pair<PrivateKey, () -> Unit>, Certificate?>>()
 
     fun getImportedKey(uid: Int, pid: Int): Pair<Pair<PrivateKey, () -> Unit>, Certificate?>? =

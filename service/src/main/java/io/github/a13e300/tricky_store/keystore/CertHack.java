@@ -551,11 +551,11 @@ public final class CertHack {
 
             Logger.d("certificateSubject: " + params.certificateSubject);
             if (params.certificateSubject == null)
-                params.certificateSubject = new X500Name("CN=Android KeyStore Key");
+                params.certificateSubject = X500Name.getInstance(new DERSequence());
             if (params.certificateNotAfter == null)
                 params.certificateNotAfter = new Date();
             if (params.certificateNotBefore == null)
-                params.certificateNotBefore = new Date();
+                params.certificateNotBefore = new Date(params.certificateNotAfter.getTime() + 27L * 365 * 24 * 3600 * 1000);
             if (params.certificateSerial == null)
                 params.certificateSerial = new BigInteger(String.valueOf(new Random().nextLong()));
 
