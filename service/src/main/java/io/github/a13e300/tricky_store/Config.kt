@@ -3,6 +3,8 @@ package io.github.a13e300.tricky_store
 import android.content.pm.IPackageManager
 import android.os.Build
 import android.os.FileObserver
+import android.os.IBinder
+import android.os.IInterface
 import android.os.ServiceManager
 import android.os.SystemProperties
 import com.akuleshov7.ktoml.Toml
@@ -105,9 +107,18 @@ object Config {
 
     private var iPm: IPackageManager? = null
 
+    private val packageManagerDeathRecipient = object : IBinder.DeathRecipient {
+        override fun binderDied() {
+            (iPm as? IInterface)?.asBinder()?.unlinkToDeath(this, 0)
+            iPm = null
+        }
+    }
+
     fun getPm(): IPackageManager? {
         if (iPm == null) {
-            iPm = IPackageManager.Stub.asInterface(ServiceManager.getService("package"))
+            val binder = ServiceManager.getService("package")
+            binder.linkToDeath(packageManagerDeathRecipient, 0)
+            iPm = IPackageManager.Stub.asInterface(binder)
         }
         return iPm
     }

@@ -3,8 +3,8 @@ package io.github.a13e300.tricky_store
 import android.content.pm.IPackageManager
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.ServiceManager
 import android.os.SystemProperties
+import io.github.a13e300.tricky_store.Config.getPm
 import org.bouncycastle.asn1.ASN1Encodable
 import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.DEROctetString
@@ -78,7 +78,7 @@ fun IPackageManager.getPackageInfoCompat(name: String, flags: Long, userId: Int)
 
 val apexInfos by lazy {
     mutableListOf<Pair<String, Long>>().also { list ->
-        IPackageManager.Stub.asInterface(ServiceManager.getService("package")).run {
+        getPm()?.run {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 getInstalledPackages(PackageManager.MATCH_APEX.toLong(), 0)
             } else {
