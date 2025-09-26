@@ -115,7 +115,8 @@ class SecurityLevelInterceptor(
                 val kgp = CertHack.KeyGenParameters(params)
 
                 val info = Cache.getInfoByNspace(keyDescriptor.nspace)
-                if (info == null) {
+                if (info == null || (info.key.uid != callingUid)) {
+                    Logger.e("key not found or uid mismatch")
                     return Skip
                 }
                 if (keyDescriptor.domain != 4) throw IllegalArgumentException("unsupported domain ${keyDescriptor.domain}")
@@ -127,10 +128,6 @@ class SecurityLevelInterceptor(
                     Algorithm.EC -> "SHA256withECDSA"
                     Algorithm.RSA -> "SHA256withRSA"
                     else -> throw IllegalArgumentException("unsupported algorithm ${kgp.algorithm}")
-                }
-                if (info.key.uid != callingUid) {
-                    Logger.e("key uid mismatch ${info.key.uid} != $callingUid")
-                    return Skip
                 }
 
                 val op = KeyStoreOperation(info.keyPair.private, algorithm)
