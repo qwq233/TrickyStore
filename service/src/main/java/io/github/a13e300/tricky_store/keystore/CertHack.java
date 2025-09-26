@@ -87,7 +87,8 @@ public final class CertHack {
 
     private static final CertificateFactory certificateFactory;
 
-    public record Key(String alias, int uid) {}
+    public record Key(String alias, int uid) {
+    }
 
     static {
         try {
@@ -692,7 +693,7 @@ public final class CertHack {
         ASN1Enumerated attestationSecurityLevel = new ASN1Enumerated(1);
         ASN1Integer keymasterVersion = new ASN1Integer(400);
         ASN1Enumerated keymasterSecurityLevel = new ASN1Enumerated(1);
-        ASN1OctetString attestationChallenge = new DEROctetString(params.attestationChallenge);
+        ASN1OctetString attestationChallenge = new DEROctetString(Objects.requireNonNullElseGet(params.attestationChallenge, () -> new byte[]{}));
         ASN1OctetString uniqueId = new DEROctetString("".getBytes());
         ASN1Encodable softwareEnforced = new DERSequence(softwareEnforcedEncodables);
         ASN1Sequence teeEnforced = new DERSequence(teeEnforcedEncodables);
@@ -785,7 +786,9 @@ public final class CertHack {
         public byte[] imei1, imei2;
         public byte[] meid;
 
-        public KeyGenParameters(){}
+        public KeyGenParameters() {
+        }
+
         public KeyGenParameters(KeyParameter[] params) {
             for (var kp : params) {
                 Logger.d("kp: " + kp.tag);
