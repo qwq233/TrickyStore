@@ -20,57 +20,43 @@ import java.security.cert.Certificate
 import java.util.concurrent.ConcurrentHashMap
 
 class SecurityLevelInterceptor(
-    private val original: IKeystoreSecurityLevel,
-    private val level: Int
+    private val original: IKeystoreSecurityLevel, private val level: Int
 ) : BinderInterceptor() {
     companion object {
-        private val generateKeyTransaction =
-            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey")
-        private val deleteKeyTransaction =
-            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "deleteKey")
-        private val createOperationTransaction =
-            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "createOperation")
-        private val importWrappedKeyTransaction =
-            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importWrappedKey")
-        private val importKeyTransaction =
-            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importKey")
+        private val generateKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey")
+        private val deleteKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "deleteKey")
+        private val createOperationTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "createOperation")
+        private val importWrappedKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importWrappedKey")
+        private val importKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importKey")
 
         val keys = ConcurrentHashMap<Key, Info>()
         val keyPairs = ConcurrentHashMap<Key, Pair<KeyPair, List<Certificate>>>()
 
-        fun getKeyResponse(uid: Int, alias: String): KeyEntryResponse? =
-            keys[Key(uid, alias)]?.response
-        fun getKeyPairs(uid: Int, alias: String): Pair<KeyPair, List<Certificate>>? =
-            keyPairs[Key(uid, alias)]
+        fun getKeyResponse(uid: Int, alias: String): KeyEntryResponse? = keys[Key(uid, alias)]?.response
+
+        fun getKeyPairs(uid: Int, alias: String): Pair<KeyPair, List<Certificate>>? = keyPairs[Key(uid, alias)]
     }
 
     data class Key(val uid: Int, val alias: String)
     data class Info(val keyPair: KeyPair, val response: KeyEntryResponse)
 
     override fun onPreTransact(
-        target: IBinder,
-        code: Int,
-        flags: Int,
-        callingUid: Int,
-        callingPid: Int,
-        data: Parcel
+        target: IBinder, code: Int, flags: Int, callingUid: Int, callingPid: Int, data: Parcel
     ): Result {
         Logger.d("SecurityLevelInterceptor received onPreTransact code=$code uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
         if (!Config.needGenerate(callingUid)) return Skip
-        if (code == generateKeyTransaction) {
-            Logger.i("intercept key gen uid=$callingUid pid=$callingPid")
-            kotlin.runCatching {
+        when (code) {
+            generateKeyTransaction -> runCatching {
+                Logger.i("intercept key gen uid=$callingUid pid=$callingPid")
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
-                val keyDescriptor =
-                    data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
+                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                 val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
                 data.readInt()
                 data.createByteArray()
                 val kgp = CertHack.KeyGenParameters(params)
                 // Logger.e("warn: attestation key not supported now")
-                val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp)
-                    ?: return@runCatching
+                val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp) ?: return@runCatching
                 keyPairs[Key(callingUid, keyDescriptor.alias)] = Pair(pair.first, pair.second)
                 val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
                 keys[Key(callingUid, keyDescriptor.alias)] = Info(pair.first, response)
@@ -81,12 +67,12 @@ class SecurityLevelInterceptor(
             }.onFailure {
                 Logger.e("parse key gen request", it)
             }
-        } else if (code == importKeyTransaction) {
-            kotlin.runCatching {
+
+
+            importKeyTransaction -> runCatching {
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
 
-                val keyDescriptor =
-                    data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
+                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                 val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
                 data.readInt()
@@ -129,7 +115,20 @@ class SecurityLevelInterceptor(
             }.onFailure {
                 Logger.e("", it)
             }
-            return Skip
+
+            createOperationTransaction -> runCatching {
+                data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
+                Logger.d("createOperationTransaction uid=$callingUid pid=$callingPid")
+
+                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
+                val params = data.createTypedArray(KeyParameter.CREATOR) ?: return Skip
+                val kgp = CertHack.KeyGenParameters(params)
+
+                kgp.algorithm
+                kgp.digest
+                if (keyDescriptor.domain != 4) throw IllegalArgumentException("unsupported domain ${keyDescriptor.domain}")
+
+            }
         }
         return Skip
     }

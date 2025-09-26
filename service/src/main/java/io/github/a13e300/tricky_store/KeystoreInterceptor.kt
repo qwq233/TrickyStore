@@ -38,55 +38,62 @@ object KeystoreInterceptor : BinderInterceptor() {
     ): Result {
         if (!Config.needGenerate(callingUid)) return Skip
         Logger.d("KeystoreInceptor onPreTransact code=$code")
-        if (code == getKeyEntryTransaction) {
-            Logger.d("KeystoreInceptor getKeyEntryTransaction pre $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
-            if (CertHack.canHack()) {
-                if (Config.needGenerate(callingUid))
-                    runCatching {
-                        data.enforceInterface(IKeystoreService.DESCRIPTOR)
-                        val descriptor =
-                            data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
-                        val response =
-                            SecurityLevelInterceptor.getKeyResponse(callingUid, descriptor.alias)
-                        val p = Parcel.obtain()
-                        if (response == null) {
-                            p.writeTypedObject(null, 0)
-                        } else {
-                            Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
-                            p.writeNoException()
-                            p.writeTypedObject(response, 0)
+        when (code) {
+            getKeyEntryTransaction -> {
+                Logger.d("KeystoreInceptor getKeyEntryTransaction pre $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
+                if (CertHack.canHack()) {
+                    if (Config.needGenerate(callingUid))
+                        runCatching {
+                            data.enforceInterface(IKeystoreService.DESCRIPTOR)
+                            val descriptor =
+                                data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
+                            val response =
+                                SecurityLevelInterceptor.getKeyResponse(callingUid, descriptor.alias)
+                            val p = Parcel.obtain()
+                            if (response == null) {
+                                p.writeTypedObject(null, 0)
+                            } else {
+                                Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
+                                p.writeNoException()
+                                p.writeTypedObject(response, 0)
+                            }
+                            return OverrideReply(0, p)
                         }
-                        return OverrideReply(0, p)
+                    else if (Config.needHack(callingUid)) return Continue
+                    return Skip
+                }
+            }
+
+            updateSubcomponentTransaction -> {
+                Logger.d("KeystoreInceptor onPreTransact updateSubcomponent uid=$callingUid pid=$callingPid")
+                runCatching {
+                    data.enforceInterface(IKeystoreService.DESCRIPTOR)
+                    val descriptor =
+                        data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
+                    val publicCert = data.createByteArray()
+                    val certificateChain = data.createByteArray()
+
+                    if (certificateChain != null) {
+                        Logger.d("updateSubcomponent certificateChain sz=${certificateChain.size}")
                     }
-                else if (Config.needHack(callingUid)) return Continue
-                return Skip
-            }
-        } else if (code == updateSubcomponentTransaction) {
-            Logger.d("KeystoreInceptor onPreTransact updateSubcomponent uid=$callingUid pid=$callingPid")
-            runCatching {
-                data.enforceInterface(IKeystoreService.DESCRIPTOR)
-                val descriptor =
-                    data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
-                val publicCert = data.createByteArray()
-                val certificateChain = data.createByteArray()
 
-                if (certificateChain != null) {
-                    Logger.d("updateSubcomponent certificateChain sz=${certificateChain.size}")
+                    if (publicCert != null) {
+                        val cf: CertificateFactory = CertificateFactory.getInstance("X.509")
+                        val cert = cf.generateCertificate(publicCert.inputStream())
+
+                        Logger.d("$cert")
+
+                        Cache.finalizedImportedKey(callingUid, callingPid, cert)
+                        Logger.i("store public cert uid=$callingUid alias=${descriptor.alias} sz=${publicCert.size}")
+                    }
+                }.onFailure {
+                    Logger.e("failed to read updateSubcomponent data", it)
                 }
-
-                if (publicCert != null) {
-                    val cf: CertificateFactory = CertificateFactory.getInstance("X.509")
-                    val cert = cf.generateCertificate(publicCert.inputStream())
-
-                    Logger.d("$cert")
-
-                    Cache.finalizedImportedKey(callingUid, callingPid, cert)
-                    Logger.i("store public cert uid=$callingUid alias=${descriptor.alias} sz=${publicCert.size}")
-                }
-            }.onFailure {
-                Logger.e("failed to read updateSubcomponent data", it)
             }
 
+            deleteKeyTransaction -> {
+                Logger.d("KeystoreInceptor onPreTransact deleteKeyTransaction uid=$callingUid pid=$callingPid")
+            }
         }
         return Skip
     }
