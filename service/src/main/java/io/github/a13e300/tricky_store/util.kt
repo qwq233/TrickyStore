@@ -77,22 +77,20 @@ fun IPackageManager.getPackageInfoCompat(name: String, flags: Long, userId: Int)
     }
 
 val apexInfos by lazy {
-    mutableListOf<Pair<String, Long>>().also { list ->
-        getPm()?.run {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                getInstalledPackages(PackageManager.MATCH_APEX.toLong(), 0)
-            } else {
-                getInstalledPackages(PackageManager.MATCH_APEX, 0)
-            }.list.forEach {
-                list.add(it.packageName to it.longVersionCode)
-            }
-        }
-    }.sortedBy { it.first }.toList() // soft to ensure it complies with AOSP requirements (lexicographically)
+    getPm()?.run {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getInstalledPackages(PackageManager.MATCH_APEX.toLong(), 0)
+        } else {
+            getInstalledPackages(PackageManager.MATCH_APEX, 0)
+        }.list.map {
+            it.packageName to it.longVersionCode
+        }.sortedBy { it.first } // soft to ensure it complies with AOSP requirements (lexicographically)
+    }?.toList()
 }
 
 val moduleHash: ByteArray by lazy {
     mutableListOf<ASN1Encodable>().apply {
-        apexInfos.forEach {
+        apexInfos?.forEach {
             add(DEROctetString(it.first.toByteArray()))
             add(ASN1Integer(it.second))
         }
