@@ -31,17 +31,19 @@ object Cache {
 
     // generated key section
     data class Key(val uid: Int, val alias: String)
-    data class Info(val keyPair: KeyPair, val chain: List<Certificate>, val response: KeyEntryResponse)
+    data class Info(val key: Key, val keyPair: KeyPair, val chain: List<Certificate>, val response: KeyEntryResponse)
 
     private val keys = ConcurrentHashMap<Key, Info>()
 
     fun putKey(uid: Int, alias: String, keyPair: KeyPair, chain: List<Certificate>, response: KeyEntryResponse) {
-        keys[Key(uid, alias)] = Info(keyPair, chain, response)
+        keys[Key(uid, alias)] = Info(Key(uid, alias), keyPair, chain, response)
     }
 
     fun putKey(key: Key, info: Info) {
         keys[key] = info
     }
+
+    fun getInfoByNspace(nspace: Long): Info? = keys.values.firstOrNull { it.response.metadata?.key?.nspace == nspace }
 
     fun getKeyResponse(uid: Int, alias: String): KeyEntryResponse? = keys[Key(uid, alias)]?.response
 

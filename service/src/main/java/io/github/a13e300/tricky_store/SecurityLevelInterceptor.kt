@@ -7,16 +7,18 @@ import android.hardware.security.keymint.Tag
 import android.os.IBinder
 import android.os.Parcel
 import android.system.keystore2.Authorization
+import android.system.keystore2.CreateOperationResponse
+import android.system.keystore2.IKeystoreOperation
 import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
-import io.github.a13e300.tricky_store.Cache.Info
-import io.github.a13e300.tricky_store.Cache.Key
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
 import java.security.KeyFactory
+import java.security.PrivateKey
+import java.security.Signature
 import java.security.cert.Certificate
 
 class SecurityLevelInterceptor(
@@ -48,7 +50,7 @@ class SecurityLevelInterceptor(
                 // Logger.e("warn: attestation key not supported now")
                 val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp) ?: return@runCatching
                 val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
-                Cache.putKey(Key(callingUid, keyDescriptor.alias), Info(pair.first, pair.second, response))
+                Cache.putKey(callingUid, keyDescriptor.alias, pair.first, pair.second, response)
                 val p = Parcel.obtain()
                 p.writeNoException()
                 p.writeTypedObject(response.metadata, 0)
@@ -94,7 +96,7 @@ class SecurityLevelInterceptor(
                         Pair(pair.first.first, pair.second)
                     }
                     val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
-                    Cache.putKey(Key(callingUid, keyDescriptor.alias), Info(pair.first, pair.second, response))
+                    Cache.putKey(callingUid, keyDescriptor.alias, pair.first, pair.second, response)
 
                     Logger.d("imported key generated uid=$callingUid alias=${keyDescriptor.alias}")
                 }
@@ -105,12 +107,76 @@ class SecurityLevelInterceptor(
             }
 
             createOperationTransaction -> runCatching {
+                data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
+                Logger.d("createOperationTransaction uid=$callingUid pid=$callingPid")
 
+                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
+                val params = data.createTypedArray(KeyParameter.CREATOR) ?: return Skip
+                val kgp = CertHack.KeyGenParameters(params)
+
+                val info = Cache.getInfoByNspace(keyDescriptor.nspace)
+                if (info == null) {
+                    return Skip
+                }
+                if (keyDescriptor.domain != 4) throw IllegalArgumentException("unsupported domain ${keyDescriptor.domain}")
+                kgp.purpose.any { it != 2 /* sign */ && it != 7 /* attest */ } ||
+                        throw IllegalArgumentException("unsupported purpose ${kgp.purpose}")
+                kgp.digest.any { it != 4 } ||
+                        throw IllegalArgumentException("unsupported digest ${kgp.digest}")
+                val algorithm = when (kgp.algorithm) {
+                    Algorithm.EC -> "SHA256withECDSA"
+                    Algorithm.RSA -> "SHA256withRSA"
+                    else -> throw IllegalArgumentException("unsupported algorithm ${kgp.algorithm}")
+                }
+                if (info.key.uid != callingUid) {
+                    Logger.e("key uid mismatch ${info.key.uid} != $callingUid")
+                    return Skip
+                }
+
+                val op = KeyStoreOperation(info.keyPair.private, algorithm)
+                val parcel = Parcel.obtain()
+                parcel.writeNoException()
+                val createOperationResponse = CreateOperationResponse().apply {
+                    iOperation = op
+                }
+                parcel.writeTypedObject(createOperationResponse, 0)
+
+                return OverrideReply(0, parcel)
             }.onFailure {
                 Logger.e("", it)
             }
         }
         return Skip
+    }
+
+    private class KeyStoreOperation : IKeystoreOperation.Stub {
+        val signature: Signature
+        var isAborted = false
+
+        constructor(privateKey: PrivateKey, algorithm: String) {
+            signature = Signature.getInstance(algorithm)
+            signature.initSign(privateKey)
+        }
+
+        override fun updateAad(aadInput: ByteArray?) {
+            // do nothing for now
+        }
+
+        override fun update(input: ByteArray): ByteArray? {
+            if (isAborted) throw IllegalStateException("operation aborted")
+            signature.update(input)
+            return null
+        }
+
+        override fun finish(input: ByteArray?, signature: ByteArray?): ByteArray? {
+            if (isAborted) throw IllegalStateException("operation aborted")
+            this.signature.update(input)
+            return this.signature.sign()
+        }
+
+        override fun abort() {
+            isAborted = true
+        }
     }
 
     private fun buildResponse(

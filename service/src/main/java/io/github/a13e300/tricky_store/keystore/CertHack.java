@@ -71,9 +71,9 @@ import java.util.Set;
 
 import javax.security.auth.x500.X500Principal;
 
+import io.github.a13e300.tricky_store.Cache;
 import io.github.a13e300.tricky_store.Config;
 import io.github.a13e300.tricky_store.Logger;
-import io.github.a13e300.tricky_store.SecurityLevelInterceptor;
 import io.github.a13e300.tricky_store.UtilKt;
 
 public final class CertHack {
@@ -471,7 +471,7 @@ public final class CertHack {
             ).getSubject();
 
             if (attestPurpose) {
-                var info = SecurityLevelInterceptor.Companion.getKeyPairs(uid, attestKeyDescriptor.alias);
+                var info = Cache.INSTANCE.getKeyPairs(uid, attestKeyDescriptor.alias);
                 if (info != null) {
                     rootKP = info.getFirst();
                     issuer = new X509CertificateHolder(
