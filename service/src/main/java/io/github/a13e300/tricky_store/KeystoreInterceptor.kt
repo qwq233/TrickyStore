@@ -113,6 +113,7 @@ object KeystoreInterceptor : BinderInterceptor() {
 
             Logger.d("KeystoreInterceptor deleteKey uid=$callingUid alias=${keyDescriptor.alias}")
             SecurityLevelInterceptor.keys.remove(SecurityLevelInterceptor.Key(callingUid, keyDescriptor.alias))
+            Cache.removeImportedKey(callingUid, callingPid)
 
             return Skip
         } else if (code == getKeyEntryTransaction) {

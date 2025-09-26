@@ -17,6 +17,8 @@ object Cache {
         importedKeys[Owner(uid, pid)] = Pair(Pair(privateKey, onFinish), null) as Pair<Pair<PrivateKey, () -> Unit>, Certificate?>
     }
 
+    fun removeImportedKey(uid: Int, pid: Int) = importedKeys.remove(Owner(uid, pid))
+
     fun finalizedImportedKey(uid: Int, pid: Int, cert: Certificate) {
         val pair = importedKeys[Owner(uid, pid)] ?: return
         importedKeys[Owner(uid, pid)] = Pair(pair.first, cert)
