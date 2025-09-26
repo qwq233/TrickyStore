@@ -8,6 +8,7 @@ import android.os.ServiceManager
 import android.system.keystore2.IKeystoreService
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
+import io.github.a13e300.tricky_store.Cache.Key
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
@@ -48,7 +49,7 @@ object KeystoreInterceptor : BinderInterceptor() {
                             val descriptor =
                                 data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                             val response =
-                                SecurityLevelInterceptor.getKeyResponse(callingUid, descriptor.alias)
+                                Cache.getKeyResponse(callingUid, descriptor.alias)
                             val p = Parcel.obtain()
                             if (response == null) {
                                 p.writeTypedObject(null, 0)
@@ -119,8 +120,9 @@ object KeystoreInterceptor : BinderInterceptor() {
             if (keyDescriptor == null || keyDescriptor.domain == 0) return Skip
 
             Logger.d("KeystoreInterceptor deleteKey uid=$callingUid alias=${keyDescriptor.alias}")
-            SecurityLevelInterceptor.keys.remove(SecurityLevelInterceptor.Key(callingUid, keyDescriptor.alias))
-            Cache.removeImportedKey(callingUid, callingPid)
+
+            Cache.deleteKey(Key(callingUid, keyDescriptor.alias))
+            Cache.deleteImportedKey(callingUid, callingPid)
 
             return Skip
         } else if (code == getKeyEntryTransaction) {

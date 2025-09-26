@@ -11,13 +11,13 @@ import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
+import io.github.a13e300.tricky_store.Cache.Info
+import io.github.a13e300.tricky_store.Cache.Key
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
 import java.security.KeyFactory
-import java.security.KeyPair
 import java.security.cert.Certificate
-import java.util.concurrent.ConcurrentHashMap
 
 class SecurityLevelInterceptor(
     private val original: IKeystoreSecurityLevel, private val level: Int
@@ -29,17 +29,7 @@ class SecurityLevelInterceptor(
         private val importWrappedKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importWrappedKey")
         private val importKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importKey")
 
-        val keys = ConcurrentHashMap<Key, Info>()
-        val keyPairs = ConcurrentHashMap<Key, Pair<KeyPair, List<Certificate>>>()
-
-        fun getKeyResponse(uid: Int, alias: String): KeyEntryResponse? = keys[Key(uid, alias)]?.response
-
-        fun getKeyPairs(uid: Int, alias: String): Pair<KeyPair, List<Certificate>>? = keyPairs[Key(uid, alias)]
     }
-
-    data class Key(val uid: Int, val alias: String)
-    data class Info(val keyPair: KeyPair, val response: KeyEntryResponse)
-
     override fun onPreTransact(
         target: IBinder, code: Int, flags: Int, callingUid: Int, callingPid: Int, data: Parcel
     ): Result {
@@ -57,9 +47,8 @@ class SecurityLevelInterceptor(
                 val kgp = CertHack.KeyGenParameters(params)
                 // Logger.e("warn: attestation key not supported now")
                 val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp) ?: return@runCatching
-                keyPairs[Key(callingUid, keyDescriptor.alias)] = Pair(pair.first, pair.second)
                 val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
-                keys[Key(callingUid, keyDescriptor.alias)] = Info(pair.first, response)
+                Cache.putKey(Key(callingUid, keyDescriptor.alias), Info(pair.first, pair.second, response))
                 val p = Parcel.obtain()
                 p.writeNoException()
                 p.writeTypedObject(response.metadata, 0)
@@ -104,9 +93,8 @@ class SecurityLevelInterceptor(
                         val pair = Cache.getImportedKey(callingUid, callingPid) ?: return@generateKeyPairWithImportedKey null
                         Pair(pair.first.first, pair.second)
                     }
-                    keyPairs[Key(callingUid, keyDescriptor.alias)] = Pair(pair.first, pair.second)
                     val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
-                    keys[Key(callingUid, keyDescriptor.alias)] = Info(pair.first, response)
+                    Cache.putKey(Key(callingUid, keyDescriptor.alias), Info(pair.first, pair.second, response))
 
                     Logger.d("imported key generated uid=$callingUid alias=${keyDescriptor.alias}")
                 }
@@ -117,17 +105,9 @@ class SecurityLevelInterceptor(
             }
 
             createOperationTransaction -> runCatching {
-                data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
-                Logger.d("createOperationTransaction uid=$callingUid pid=$callingPid")
 
-                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
-                val params = data.createTypedArray(KeyParameter.CREATOR) ?: return Skip
-                val kgp = CertHack.KeyGenParameters(params)
-
-                kgp.algorithm
-                kgp.digest
-                if (keyDescriptor.domain != 4) throw IllegalArgumentException("unsupported domain ${keyDescriptor.domain}")
-
+            }.onFailure {
+                Logger.e("", it)
             }
         }
         return Skip
