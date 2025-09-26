@@ -17,9 +17,7 @@
 
 #include "logging.hpp"
 #include "lsplt.hpp"
-#include "elf_util.h"
 
-using namespace SandHook;
 using namespace android;
 
 class BinderInterceptor : public BBinder {

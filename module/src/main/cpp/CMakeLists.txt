@@ -6,16 +6,13 @@ link_libraries(cxx::cxx)
 
 add_definitions(-std=c++20)
 
-add_library(elf_util STATIC elf_util/elf_util.cpp)
 add_library(my_logging STATIC logging/logging.cpp)
 
 add_subdirectory(external)
 
 target_include_directories(my_logging PUBLIC logging/include)
-target_include_directories(elf_util PUBLIC elf_util/include)
 
 target_link_libraries(my_logging log)
-target_link_libraries(elf_util lsplt my_logging)
 
 # libutils stub
 add_library(utils SHARED binder/stub_utils.cpp)
@@ -30,4 +27,4 @@ add_executable(libinject.so inject/main.cpp inject/utils.cpp)
 target_link_libraries(libinject.so PRIVATE lsplt my_logging)
 
 add_library(${MODULE_NAME} SHARED binder_interceptor.cpp)
-target_link_libraries(${MODULE_NAME} PRIVATE log binder utils elf_util my_logging)
+target_link_libraries(${MODULE_NAME} PRIVATE log binder lsplt utils my_logging)
