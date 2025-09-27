@@ -489,7 +489,13 @@ public final class CertHack {
                     kp.getPublic()
             );
 
-            KeyUsage keyUsage = new KeyUsage(KeyUsage.keyCertSign);
+            params.purpose.forEach((it) -> Logger.d("CertHack: Purpose: " + it));
+            KeyUsage keyUsage;
+            if (params.purpose.stream().anyMatch((it) -> it == 0 || it == 1)) {
+                keyUsage = new KeyUsage(KeyUsage.keyEncipherment | KeyUsage.dataEncipherment);
+            } else {
+                keyUsage = new KeyUsage(KeyUsage.keyCertSign);
+            }
             certBuilder.addExtension(Extension.keyUsage, true, keyUsage);
             certBuilder.addExtension(createExtension(params, uid));
 
