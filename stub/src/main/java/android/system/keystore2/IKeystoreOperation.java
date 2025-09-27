@@ -1,5 +1,6 @@
 package android.system.keystore2;
 
+import android.hardware.security.keymint.ErrorCode;
 import android.os.IBinder;
 import android.os.IInterface;
 
@@ -8,7 +9,7 @@ import androidx.annotation.Nullable;
 /**
  * {@code IKeystoreOperation} represents a cryptographic operation using a Keystore key.
  *
- * <p>The lifecycle of an operation begins with {@link KeystoreSecurityLevel#create}
+ * <p>The lifecycle of an operation begins with {@link IKeystoreSecurityLevel#create}
  * and ends with a call to {@link #finish}, {@link #abort}, or when the reference to
  * the binder object is released.
  *
@@ -19,9 +20,9 @@ import androidx.annotation.Nullable;
  * <h2>Error Conditions</h2>
  * <p>Error conditions are reported as service-specific errors:
  * <ul>
- *   <li>Positive error codes correspond to {@code android.system.keystore2.ResponseCode}
+ *   <li>Positive error codes correspond to {@link android.system.keystore2.ResponseCode}
  *       and indicate error conditions diagnosed by the Keystore 2.0 service.</li>
- *   <li>Negative error codes correspond to {@code android.hardware.security.keymint.ErrorCode}
+ *   <li>Negative error codes correspond to {@link android.hardware.security.keymint.ErrorCode}
  *       and indicate KeyMint backend errors. Refer to the KeyMint interface specification
  *       for detailed information.</li>
  * </ul>
@@ -32,23 +33,23 @@ public interface IKeystoreOperation extends IInterface {
     /**
      * Advances an operation by adding Additional Authenticated Data (AAD) to AEAD mode
      * encryption or decryption operations. This method cannot be called after {@link #update},
-     * and attempting to do so will result in {@code ErrorCode.INVALID_TAG}. This error code
+     * and attempting to do so will result in {@link ErrorCode#INVALID_TAG}. This error code
      * is used for historical reasons, dating back when AAD was passed as an additional
      * {@code KeyParameter} with the tag {@code ASSOCIATED_DATA}.
      *
      * <h2>Error Conditions</h2>
      * <ul>
-     *   <li>{@code ResponseCode.TOO_MUCH_DATA} if {@code aadInput} exceeds 32KiB.</li>
-     *   <li>{@code ResponseCode.OPERATION_BUSY} if {@code updateAad} is called concurrently
+     *   <li>{@link ResponseCode#TOO_MUCH_DATA} if {@code aadInput} exceeds 32KiB.</li>
+     *   <li>{@link ResponseCode#OPERATION_BUSY} if {@code updateAad} is called concurrently
      *       with any other {@code IKeystoreOperation} API call.</li>
-     *   <li>{@code ErrorCode.INVALID_TAG} if {@code updateAad} is called after {@link #update}
+     *   <li>{@link ErrorCode#INVALID_TAG} if {@code updateAad} is called after {@link #update}
      *       on a given operation.</li>
-     *   <li>{@code ErrorCode.INVALID_OPERATION_HANDLE} if the operation has been finalized
+     *   <li>{@link ErrorCode#INVALID_OPERATION_HANDLE} if the operation has been finalized
      *       for any reason.</li>
      * </ul>
      * <p>
-     * Note: Any error condition except {@code ResponseCode.OPERATION_BUSY} finalizes the
-     * operation, causing subsequent API calls to return {@code INVALID_OPERATION_HANDLE}.
+     * Note: Any error condition except {@link ResponseCode#OPERATION_BUSY} finalizes the
+     * operation, causing subsequent API calls to return {@link ErrorCode#INVALID_OPERATION_HANDLE}.
      *
      * @param aadInput the Additional Authenticated Data to be added to the operation
      */
@@ -63,15 +64,15 @@ public interface IKeystoreOperation extends IInterface {
      *
      * <h2>Error Conditions</h2>
      * <ul>
-     *   <li>{@code ResponseCode.TOO_MUCH_DATA} if the {@code input} exceeds 32KiB.</li>
-     *   <li>{@code ResponseCode.OPERATION_BUSY} if {@code updateAad} is called concurrently
+     *   <li>{@link ResponseCode#TOO_MUCH_DATA} if the {@code input} exceeds 32KiB.</li>
+     *   <li>{@link ResponseCode#OPERATION_BUSY} if {@code updateAad} is called concurrently
      *       with any other {@code IKeystoreOperation} API call.</li>
-     *   <li>{@code ErrorCode.INVALID_OPERATION_HANDLE} if the operation has been finalized
+     *   <li>{@link ErrorCode#INVALID_OPERATION_HANDLE} if the operation has been finalized
      *       for any reason.</li>
      * </ul>
      * <p>
-     * Note: Any error condition except {@code ResponseCode.OPERATION_BUSY} finalizes the
-     * operation, causing subsequent API calls to return {@code INVALID_OPERATION_HANDLE}.
+     * Note: Any error condition except {@link ResponseCode#OPERATION_BUSY} finalizes the
+     * operation, causing subsequent API calls to return {@link ErrorCode#INVALID_OPERATION_HANDLE}.
      *
      * @param input the input data to process
      * @return the output data, which may be cipher text during encryption, plain text
@@ -87,15 +88,15 @@ public interface IKeystoreOperation extends IInterface {
      *
      * <h2>Error Conditions</h2>
      * <ul>
-     *   <li>{@code ResponseCode.TOO_MUCH_DATA} if the {@code input} exceeds 32KiB.</li>
-     *   <li>{@code ResponseCode.OPERATION_BUSY} if {@code updateAad} is called concurrently
+     *   <li>{@link ResponseCode#TOO_MUCH_DATA} if the {@code input} exceeds 32KiB.</li>
+     *   <li>{@link ResponseCode#OPERATION_BUSY} if {@code updateAad} is called concurrently
      *       with any other {@code IKeystoreOperation} API call.</li>
-     *   <li>{@code ErrorCode.INVALID_OPERATION_HANDLE} if the operation has already been
+     *   <li>{@link ErrorCode#INVALID_OPERATION_HANDLE} if the operation has already been
      *       finalized for any reason.</li>
      * </ul>
      * <p>
      * Note: {@code finish} finalizes the operation regardless of the outcome, unless
-     * {@code ResponseCode.OPERATION_BUSY} is returned.
+     * {@link ResponseCode#OPERATION_BUSY} is returned.
      *
      * @param input     the final chunk of input data to process
      * @param signature an optional HMAC signature for HMAC verification operations
@@ -109,7 +110,7 @@ public interface IKeystoreOperation extends IInterface {
      * Aborts the operation immediately.
      *
      * <p>Note: {@code abort} finalizes the operation regardless of the outcome, unless
-     * {@code ResponseCode.OPERATION_BUSY} is returned.
+     * {@link ResponseCode#OPERATION_BUSY} is returned.
      */
     void abort();
 
