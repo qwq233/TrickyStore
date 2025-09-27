@@ -497,7 +497,11 @@ public final class CertHack {
                 keyUsage = new KeyUsage(KeyUsage.keyCertSign);
             }
             certBuilder.addExtension(Extension.keyUsage, true, keyUsage);
-            certBuilder.addExtension(createExtension(params, uid));
+            if (params.attestationChallenge != null) {
+                certBuilder.addExtension(createExtension(params, uid));
+            } else {
+                Logger.d("No attestationChallenge provided, skipping attestation extension");
+            }
 
             ContentSigner contentSigner;
             if (algo == Algorithm.EC) {
