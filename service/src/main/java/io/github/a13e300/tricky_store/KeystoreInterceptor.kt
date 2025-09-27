@@ -17,12 +17,14 @@ import kotlin.system.exitProcess
 
 @SuppressLint("BlockedPrivateApi")
 object KeystoreInterceptor : BinderInterceptor() {
+    private val getSecurityLevelTransaction =
+        getTransactCode(IKeystoreService.Stub::class.java, "getSecurityLevel") // 1
     private val getKeyEntryTransaction =
         getTransactCode(IKeystoreService.Stub::class.java, "getKeyEntry") // 2
-    private val deleteKeyTransaction =
-        getTransactCode(IKeystoreService.Stub::class.java, "deleteKey")
     private val updateSubcomponentTransaction =
-        getTransactCode(IKeystoreService.Stub::class.java, "updateSubcomponent")
+        getTransactCode(IKeystoreService.Stub::class.java, "updateSubcomponent") // 3
+    private val deleteKeyTransaction =
+        getTransactCode(IKeystoreService.Stub::class.java, "deleteKey") // 5
 
     private lateinit var keystore: IBinder
 
@@ -94,6 +96,16 @@ object KeystoreInterceptor : BinderInterceptor() {
 
             deleteKeyTransaction -> {
                 Logger.d("KeystoreInceptor onPreTransact deleteKeyTransaction uid=$callingUid pid=$callingPid")
+                data.enforceInterface("android.system.keystore2.IKeystoreService")
+                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
+                if (keyDescriptor == null) return Skip
+
+                Logger.d("KeystoreInterceptor deleteKey uid=$callingUid alias=${keyDescriptor.alias}")
+
+                Cache.deleteKey(Key(callingUid, keyDescriptor.alias))
+                Cache.deleteImportedKey(callingUid, callingPid)
+
+                return Skip
             }
         }
         return Skip

@@ -25,11 +25,16 @@ class SecurityLevelInterceptor(
     private val original: IKeystoreSecurityLevel, private val level: Int
 ) : BinderInterceptor() {
     companion object {
-        private val generateKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey")
-        private val deleteKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "deleteKey")
-        private val createOperationTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "createOperation")
-        private val importWrappedKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importWrappedKey")
-        private val importKeyTransaction = getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importKey")
+        private val createOperationTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "createOperation") //1
+        private val generateKeyTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey") // 2
+        private val importKeyTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importKey") // 3
+        private val importWrappedKeyTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "importWrappedKey") // 4
+        private val deleteKeyTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "deleteKey") // 6
 
     }
     override fun onPreTransact(
@@ -114,23 +119,30 @@ class SecurityLevelInterceptor(
                 val params = data.createTypedArray(KeyParameter.CREATOR) ?: return Skip
                 val kgp = CertHack.KeyGenParameters(params)
 
-                val info = Cache.getInfoByNspace(keyDescriptor.nspace)
-                if (info == null || (info.key.uid != callingUid)) {
-                    Logger.e("key not found or uid mismatch")
-                    return Skip
-                }
                 if (keyDescriptor.domain != 4) throw IllegalArgumentException("unsupported domain ${keyDescriptor.domain}")
                 kgp.purpose.any { it != 2 /* sign */ && it != 7 /* attest */ } ||
                         throw IllegalArgumentException("unsupported purpose ${kgp.purpose}")
-                kgp.digest.any { it != 4 } ||
-                        throw IllegalArgumentException("unsupported digest ${kgp.digest}")
                 val algorithm = when (kgp.algorithm) {
-                    Algorithm.EC -> "SHA256withECDSA"
-                    Algorithm.RSA -> "SHA256withRSA"
+                    Algorithm.EC -> "ECDSA"
+                    Algorithm.RSA -> "RSA"
                     else -> throw IllegalArgumentException("unsupported algorithm ${kgp.algorithm}")
                 }
 
-                val op = KeyStoreOperation(info.keyPair.private, algorithm)
+                val infos = Cache.getInfoByNspace(callingUid, keyDescriptor.nspace)
+                if (infos.isEmpty()) {
+                    Logger.e("key not found")
+                    return Skip
+                }
+                infos.filter { it.response.metadata.key.alias == keyDescriptor.alias }.let {
+                    it.forEach {
+                        Logger.d("found key alias=${it.key.alias} uid=${it.key.uid} actual=${it.response.metadata.key.alias}")
+                        Logger.d("createOperation", it.chain.first().toString())
+                    }
+                }
+                Logger.d("found keys number: ${infos.size}")
+                val info = infos.first { it.response.metadata.key.alias == keyDescriptor.alias && it.keyPair.private.algorithm == algorithm }
+                Logger.d("createOperation", info.chain.first().toString())
+                val op = KeyStoreOperation(info.keyPair.private, "SHA256with$algorithm")
                 val parcel = Parcel.obtain()
                 parcel.writeNoException()
                 val createOperationResponse = CreateOperationResponse().apply {
@@ -151,27 +163,32 @@ class SecurityLevelInterceptor(
         var isAborted = false
 
         constructor(privateKey: PrivateKey, algorithm: String) {
+            Logger.d("KeyStoreOperation using algorithm $algorithm, privateKey=${privateKey.algorithm}")
             signature = Signature.getInstance(algorithm)
             signature.initSign(privateKey)
         }
 
         override fun updateAad(aadInput: ByteArray?) {
             // do nothing for now
+            Logger.d("updateAad called, ignored")
         }
 
         override fun update(input: ByteArray): ByteArray? {
             if (isAborted) throw IllegalStateException("operation aborted")
+            Logger.d("update called with ${input.size} bytes")
             signature.update(input)
             return null
         }
 
         override fun finish(input: ByteArray?, signature: ByteArray?): ByteArray? {
             if (isAborted) throw IllegalStateException("operation aborted")
+            Logger.d("finish called with ${input?.size ?: 0} bytes")
             this.signature.update(input)
             return this.signature.sign()
         }
 
         override fun abort() {
+            Logger.d("abort called")
             isAborted = true
         }
     }

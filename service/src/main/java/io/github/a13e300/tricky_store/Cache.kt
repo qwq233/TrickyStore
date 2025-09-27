@@ -43,7 +43,7 @@ object Cache {
         keys[key] = info
     }
 
-    fun getInfoByNspace(nspace: Long): Info? = keys.values.firstOrNull { it.response.metadata?.key?.nspace == nspace }
+    fun getInfoByNspace(callingUid: Int, nspace: Long): List<Info> = keys.values.filter { it.key.uid == callingUid && it.response.metadata?.key?.nspace == nspace }
 
     fun getKeyResponse(uid: Int, alias: String): KeyEntryResponse? = keys[Key(uid, alias)]?.response
 

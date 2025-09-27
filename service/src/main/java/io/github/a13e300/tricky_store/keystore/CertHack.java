@@ -813,7 +813,8 @@ public final class CertHack {
                             certificateNotAfter = new Date(p.getDateTime());
                     case Tag.CERTIFICATE_SUBJECT ->
                             certificateSubject = new X500Name(new X500Principal(p.getBlob()).getName());
-                    case Tag.RSA_PUBLIC_EXPONENT -> rsaPublicExponent = new BigInteger(p.getBlob());
+                    case Tag.RSA_PUBLIC_EXPONENT ->
+                            rsaPublicExponent = new BigInteger(String.valueOf(p.getLongInteger()));
                     case Tag.EC_CURVE -> {
                         ecCurve = p.getEcCurve();
                         ecCurveName = getEcCurveName(ecCurve);

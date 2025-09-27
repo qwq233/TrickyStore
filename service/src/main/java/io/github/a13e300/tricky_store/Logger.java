@@ -8,6 +8,10 @@ public class Logger {
         Log.d(TAG, msg);
     }
 
+    public static void d(String tag, String msg) {
+        Log.d(TAG, tag + ": " + msg);
+    }
+
     public static void dd(String msg) {
         d("wtf: " + msg);
     }
