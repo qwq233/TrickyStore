@@ -135,7 +135,7 @@ object Config {
 
     private val toml = Toml(
         inputConfig = TomlInputConfig(
-            ignoreUnknownNames = false,
+            ignoreUnknownNames = true,
             allowEmptyValues = true,
             allowNullValues = true,
             allowEscapedQuotesInLiteralStrings = true,
@@ -153,7 +153,11 @@ object Config {
     @Serializable
     data class DeviceConfig(
         val generalSettings: General = General(),
-        @TomlComments("Remember to override the corresponding system properties when modifying the following values") val deviceProps: DeviceProps = DeviceProps()
+        @TomlComments("Remember to override the corresponding system properties when modifying the following values") val deviceProps: DeviceProps = DeviceProps(),
+        val globalConfig: AppConfig = AppConfig(),
+        @TomlComments("Disable specific module function.", "Do not modify if you know nothing about it.") val additionalAppConfig: Map<String, AppConfig> = mapOf(
+            "com.example.app" to AppConfig(generateKey = true, createOperation = true, importKey = true)
+        )
     ) {
         @Serializable
         data class General(
@@ -173,6 +177,13 @@ object Config {
             val meid: String = SystemProperties.get("ro.ril.oem.imei", ""),
             val imei: String = SystemProperties.get("ro.ril.oem.meid", ""),
             val imei2: String = SystemProperties.get("ro.ril.oem.imei2", ""),
+        )
+
+        @Serializable
+        data class AppConfig(
+            val generateKey: Boolean = true,
+            val createOperation: Boolean = true,
+            val importKey: Boolean = true,
         )
     }
 

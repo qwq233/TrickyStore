@@ -9,6 +9,7 @@ import android.system.keystore2.IKeystoreService
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
 import io.github.a13e300.tricky_store.Cache.Key
+import io.github.a13e300.tricky_store.Config.devConfig
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
@@ -48,6 +49,13 @@ object KeystoreInterceptor : BinderInterceptor() {
                     if (Config.needGenerate(callingUid))
                         runCatching {
                             data.enforceInterface(IKeystoreService.DESCRIPTOR)
+                            if (!devConfig.globalConfig.generateKey
+                                || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.generateKey == false
+                            ) {
+                                Logger.d("generateKey feature disabled for $callingUid")
+                                return Skip
+                            }
+
                             val descriptor =
                                 data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                             val response =
@@ -71,6 +79,12 @@ object KeystoreInterceptor : BinderInterceptor() {
                 Logger.d("KeystoreInceptor onPreTransact updateSubcomponent uid=$callingUid pid=$callingPid")
                 runCatching {
                     data.enforceInterface(IKeystoreService.DESCRIPTOR)
+                    if (!devConfig.globalConfig.importKey
+                        || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.importKey == false
+                    ) {
+                        Logger.d("importKey feature disabled for $callingUid")
+                        return Skip
+                    }
                     val descriptor =
                         data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                     val publicCert = data.createByteArray()
@@ -141,6 +155,12 @@ object KeystoreInterceptor : BinderInterceptor() {
             Logger.d("KeystoreInterceptor intercept getKeyEntry uid=$callingUid pid=$callingPid")
             try {
                 data.enforceInterface("android.system.keystore2.IKeystoreService")
+                if (!devConfig.globalConfig.generateKey
+                    || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.generateKey == false
+                ) {
+                    Logger.d("getKeyEntry feature disabled for $callingUid")
+                    return Skip
+                }
                 val response = reply.readTypedObject(KeyEntryResponse.CREATOR)
                 val chain = Utils.getCertificateChain(response)
                 if (chain != null) {
