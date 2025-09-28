@@ -121,9 +121,5 @@ val telephonyInfos by lazy {
 
 fun String.toDER() = DEROctetString(this.toByteArray())
 
-fun Int.getPackageNameByUid() = runCatching {
-    getPm()?.getPackagesForUid(this)?.first()
-}.getOrNull()
-
 fun DEROctetString.toTaggedObj(tag: Int, explicit: Boolean = true) = DERTaggedObject(explicit, tag, this)
 fun String.trimLine() = trim().split("\n").joinToString("\n") { it.trim() }

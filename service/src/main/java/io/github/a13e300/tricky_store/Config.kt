@@ -155,7 +155,7 @@ object Config {
         val generalSettings: General = General(),
         @TomlComments("Remember to override the corresponding system properties when modifying the following values") val deviceProps: DeviceProps = DeviceProps(),
         val globalConfig: AppConfig = AppConfig(),
-        @TomlComments("Disable specific module function.", "Do not modify if you know nothing about it.") val additionalAppConfig: Map<String, AppConfig> = mapOf(
+        @TomlComments("Disable specific module function for specific app.", "Do not modify if you know nothing about it.") val additionalAppConfig: Map<String, AppConfig> = mapOf(
             "com.example.app" to AppConfig(generateKey = true, createOperation = true, importKey = true)
         )
     ) {
@@ -165,6 +165,7 @@ object Config {
             @TomlComments("SDK Version (i.e.: 35 for Android 15)") val osVersion: Int = Build.VERSION.SDK_INT,
             @TomlComments("Auto reset the security patch props on startup") val autoResetProps: Boolean = true,
         )
+
         @Serializable
         data class DeviceProps(
             val brand: String = Build.BRAND,
@@ -186,6 +187,16 @@ object Config {
             val importKey: Boolean = true,
         )
     }
+
+    fun isGenerateKeyEnabled(callingUid: Int) = devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.generateKey != false && devConfig.globalConfig.generateKey
+
+    fun isCreateOperationEnabled(callingUid: Int) = devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.createOperation != false && devConfig.globalConfig.createOperation
+
+    fun isImportKeyEnabled(callingUid: Int) = devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.importKey != false && devConfig.globalConfig.importKey
+
+    private fun Int.getPackageNameByUid() = runCatching {
+        getPm()?.getPackagesForUid(this)?.first()
+    }.getOrNull()
 
     fun parseDevConfig(f: File?) = runCatching {
         f ?: return@runCatching

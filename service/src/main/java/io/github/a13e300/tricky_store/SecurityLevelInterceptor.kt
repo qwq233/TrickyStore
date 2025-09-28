@@ -13,7 +13,6 @@ import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
-import io.github.a13e300.tricky_store.Config.devConfig
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
@@ -48,9 +47,7 @@ class SecurityLevelInterceptor(
             generateKeyTransaction -> runCatching {
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
                 Logger.i("intercept key gen uid=$callingUid pid=$callingPid")
-                if (!devConfig.globalConfig.generateKey
-                    || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.generateKey == false
-                ) {
+                if (!Config.isGenerateKeyEnabled(callingUid)) {
                     Logger.d("generateKey feature disabled for $callingUid")
                     return Skip
                 }
@@ -77,9 +74,7 @@ class SecurityLevelInterceptor(
 
             importKeyTransaction -> runCatching {
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
-                if (!devConfig.globalConfig.importKey
-                    || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.importKey == false
-                ) {
+                if (!Config.isImportKeyEnabled(callingUid)) {
                     Logger.d("importKey feature disabled for $callingUid")
                     return Skip
                 }
@@ -130,9 +125,7 @@ class SecurityLevelInterceptor(
             createOperationTransaction -> runCatching {
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
                 Logger.d("createOperationTransaction uid=$callingUid pid=$callingPid")
-                if (!devConfig.globalConfig.createOperation
-                    || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.createOperation == false
-                ) {
+                if (!Config.isCreateOperationEnabled(callingUid)) {
                     Logger.d("createOperation feature disabled for $callingUid")
                     return Skip
                 }

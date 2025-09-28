@@ -9,7 +9,6 @@ import android.system.keystore2.IKeystoreService
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
 import io.github.a13e300.tricky_store.Cache.Key
-import io.github.a13e300.tricky_store.Config.devConfig
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
@@ -49,9 +48,7 @@ object KeystoreInterceptor : BinderInterceptor() {
                     if (Config.needGenerate(callingUid))
                         runCatching {
                             data.enforceInterface(IKeystoreService.DESCRIPTOR)
-                            if (!devConfig.globalConfig.generateKey
-                                || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.generateKey == false
-                            ) {
+                            if (!Config.isGenerateKeyEnabled(callingUid)) {
                                 Logger.d("generateKey feature disabled for $callingUid")
                                 return Skip
                             }
@@ -62,6 +59,7 @@ object KeystoreInterceptor : BinderInterceptor() {
                                 Cache.getKeyResponse(callingUid, descriptor.alias)
                             val p = Parcel.obtain()
                             if (response == null) {
+                                Logger.i("pass null key for uid=$callingUid alias=${descriptor.alias}")
                                 p.writeTypedObject(null, 0)
                             } else {
                                 Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
@@ -79,9 +77,7 @@ object KeystoreInterceptor : BinderInterceptor() {
                 Logger.d("KeystoreInceptor onPreTransact updateSubcomponent uid=$callingUid pid=$callingPid")
                 runCatching {
                     data.enforceInterface(IKeystoreService.DESCRIPTOR)
-                    if (!devConfig.globalConfig.importKey
-                        || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.importKey == false
-                    ) {
+                    if (!Config.isImportKeyEnabled(callingUid)) {
                         Logger.d("importKey feature disabled for $callingUid")
                         return Skip
                     }
@@ -155,9 +151,7 @@ object KeystoreInterceptor : BinderInterceptor() {
             Logger.d("KeystoreInterceptor intercept getKeyEntry uid=$callingUid pid=$callingPid")
             try {
                 data.enforceInterface("android.system.keystore2.IKeystoreService")
-                if (!devConfig.globalConfig.generateKey
-                    || devConfig.additionalAppConfig[callingUid.getPackageNameByUid()]?.generateKey == false
-                ) {
+                if (!Config.isGenerateKeyEnabled(callingUid)) {
                     Logger.d("getKeyEntry feature disabled for $callingUid")
                     return Skip
                 }
