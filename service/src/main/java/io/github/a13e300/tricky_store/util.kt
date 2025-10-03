@@ -3,6 +3,8 @@ package io.github.a13e300.tricky_store
 import android.content.pm.IPackageManager
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Parcel
+import android.os.Parcelable
 import android.os.SystemProperties
 import io.github.a13e300.tricky_store.Config.getPm
 import org.bouncycastle.asn1.ASN1Encodable
@@ -123,3 +125,14 @@ fun String.toDER() = DEROctetString(this.toByteArray())
 
 fun DEROctetString.toTaggedObj(tag: Int, explicit: Boolean = true) = DERTaggedObject(explicit, tag, this)
 fun String.trimLine() = trim().split("\n").joinToString("\n") { it.trim() }
+
+fun Parcelable.toBytes(): ByteArray {
+    val p = Parcel.obtain()
+    return try {
+        this.writeToParcel(p, 0)
+        p.marshall()
+    } finally {
+        p.recycle()
+    }
+}
+
