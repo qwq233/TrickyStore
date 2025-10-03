@@ -10,13 +10,14 @@ plugins {
 }
 
 fun String.execute(currentWorkingDir: File = file("./")): String {
-    val byteOut = ByteArrayOutputStream()
-    project.exec {
+    providers.exec {
         workingDir = currentWorkingDir
         commandLine = split("\\s".toRegex())
-        standardOutput = byteOut
+    }.standardOutput.asBytes.get().run {
+        String(this).trim()
+    }.run {
+        return this
     }
-    return String(byteOut.toByteArray()).trim()
 }
 
 val gitCommitCount = "git rev-list HEAD --count".execute().toInt()

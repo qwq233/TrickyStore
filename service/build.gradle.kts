@@ -1,4 +1,5 @@
 import android.databinding.tool.ext.capitalizeUS
+import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.daemon.common.toHexString
 import java.security.MessageDigest
 
@@ -93,36 +94,36 @@ afterEvaluate {
     android.applicationVariants.forEach { variant ->
         val variantLowered = variant.name.lowercase()
         val variantCapped = variant.name.capitalizeUS()
-        val pushTask = task<Task>("pushService$variantCapped") {
+        val pushTask = tasks.register<Task>("pushService$variantCapped") {
             group = "Service"
             dependsOn("assemble$variantCapped")
             doLast {
-                exec {
-                    commandLine(
+                providers.exec {
+                    commandLine = listOf(
                         "adb",
                         "push",
                         layout.buildDirectory.file("outputs/apk/$variantLowered/service-$variantLowered.apk")
                             .get().asFile.absolutePath,
                         "/data/local/tmp/service.apk"
                     )
-                }
-                exec {
-                    commandLine(
+                }.standardOutput.asText.get()
+                providers.exec {
+                    commandLine = listOf(
                         "adb",
                         "shell",
                         "su -c 'rm /data/adb/modules/tricky_store/service.apk; mv /data/local/tmp/service.apk /data/adb/modules/tricky_store/'"
                     )
-                }
+                }.standardOutput.asText.get()
             }
         }
 
-        task<Task>("pushAndRestartService$variantCapped") {
+        tasks.register<Task>("pushAndRestartService$variantCapped") {
             group = "Service"
             dependsOn(pushTask)
             doLast {
-                exec {
-                    commandLine("adb", "shell", "su -c \"setprop ctl.restart keystore2\"")
-                }
+                providers.exec {
+                    commandLine = listOf("adb", "shell", "su -c \"setprop ctl.restart keystore2\"")
+                }.standardOutput.asText.get()
             }
         }
     }
