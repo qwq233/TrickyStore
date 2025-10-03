@@ -183,7 +183,7 @@ object Config {
         @Serializable
         data class AppConfig(
             val generateKey: Boolean = true,
-            val createOperation: Boolean = true,
+            val createOperation: Boolean = false,
             val importKey: Boolean = true,
         )
     }
