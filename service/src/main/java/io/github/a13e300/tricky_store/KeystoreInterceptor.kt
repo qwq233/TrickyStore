@@ -5,9 +5,11 @@ import android.hardware.security.keymint.SecurityLevel
 import android.os.IBinder
 import android.os.Parcel
 import android.os.ServiceManager
+import android.os.ServiceSpecificException
 import android.system.keystore2.IKeystoreService
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
+import android.system.keystore2.ResponseCode
 import io.github.a13e300.tricky_store.Cache.Key
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
@@ -45,30 +47,34 @@ object KeystoreInterceptor : BinderInterceptor() {
             getKeyEntryTransaction -> {
                 Logger.d("KeystoreInceptor getKeyEntryTransaction pre $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
                 if (CertHack.canHack()) {
-                    if (Config.needGenerate(callingUid))
-                        runCatching {
-                            data.enforceInterface(IKeystoreService.DESCRIPTOR)
-                            if (!Config.isGenerateKeyEnabled(callingUid)) {
-                                Logger.d("generateKey feature disabled for $callingUid")
-                                return Skip
-                            }
-
-                            val descriptor =
-                                data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
-                            val response =
-                                Cache.getKeyResponse(callingUid, descriptor.alias)
-                            val p = Parcel.obtain()
-                            if (response == null) {
-                                Logger.i("pass null key for uid=$callingUid alias=${descriptor.alias}")
-                                p.writeTypedObject(null, 0)
-                            } else {
-                                Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
-                                p.writeNoException()
-                                p.writeTypedObject(response, 0)
-                            }
-                            return OverrideReply(0, p)
+                    runCatching {
+                        data.enforceInterface(IKeystoreService.DESCRIPTOR)
+                        if (!Config.isGenerateKeyEnabled(callingUid)) {
+                            Logger.d("generateKey feature disabled for $callingUid")
+                            return Skip
                         }
-                    else if (Config.needHack(callingUid)) return Continue
+
+                        val descriptor =
+                            data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
+                        val response =
+                            Cache.getKeyResponse(callingUid, descriptor.alias)
+                        val p = Parcel.obtain()
+                        if (response != null) {
+                            Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
+                            p.writeNoException()
+                            p.writeTypedObject(response, 0)
+                        } else {
+                            Logger.d("key not found for uid=$callingUid alias=${descriptor.alias}")
+                            p.writeException(
+                                ServiceSpecificException(
+                                    ResponseCode.KEY_NOT_FOUND,
+                                    "key not found for uid=$callingUid alias=${descriptor.alias}"
+                                )
+                            )
+                        }
+
+                        return OverrideReply(0, p)
+                    }
                     return Skip
                 }
             }
