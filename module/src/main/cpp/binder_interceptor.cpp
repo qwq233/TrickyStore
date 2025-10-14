@@ -259,7 +259,6 @@ BinderInterceptor::handleIntercept(sp<BBinder> target, uint32_t code, const Parc
     CHECK(tmpData.writeUint32(code));
     CHECK(tmpData.writeUint32(flags));
     CHECK(tmpData.writeInt32(IPCThreadState::self()->getCallingUid()));
-    CHECK(tmpData.writeCString(IPCThreadState::self()->getCallingSid()));
     CHECK(tmpData.writeInt32(IPCThreadState::self()->getCallingPid()));
     CHECK(tmpData.writeUint64(data.dataSize()));
     CHECK(tmpData.appendFrom(&data, 0, data.dataSize()));

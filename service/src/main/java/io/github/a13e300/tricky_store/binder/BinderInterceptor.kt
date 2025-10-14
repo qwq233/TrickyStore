@@ -52,7 +52,6 @@ open class BinderInterceptor : Binder() {
                 val theCode = data.readInt()
                 val theFlags = data.readInt()
                 val callingUid = data.readInt()
-//                val _callingSid = data.readString()
                 val callingPid = data.readInt()
                 val sz = data.readLong()
                 val theData = Parcel.obtain()
@@ -63,7 +62,7 @@ open class BinderInterceptor : Binder() {
                     val ctx = CallerInfo().apply {
                         this.callingUid = callingUid.toLong()
                         this.callingPid = callingPid.toLong()
-                        this.callingSid = callingSid
+                        this.callingSid = "reserved"
                     }
 
                     onPreTransact(target, theCode, theFlags, ctx, theData)
