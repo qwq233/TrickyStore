@@ -18,6 +18,7 @@ import android.security.keystore.IKeystoreService
 import android.security.keystore.KeystoreResponse
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
+import top.qwq2333.ohmykeymint.CallerInfo
 import java.math.BigInteger
 import java.security.KeyPair
 import java.util.Date
@@ -48,10 +49,11 @@ object Keystore1Interceptor : BinderInterceptor() {
         target: IBinder,
         code: Int,
         flags: Int,
-        callingUid: Int,
-        callingPid: Int,
+        ctx: CallerInfo,
         data: Parcel
     ): Result {
+        val callingUid = ctx.callingUid.toInt()
+        ctx.callingPid.toInt()
         if (CertHack.canHack()) {
             if (code == getTransaction) {
                 if (Config.needHack(callingUid)) {
@@ -219,12 +221,13 @@ object Keystore1Interceptor : BinderInterceptor() {
         target: IBinder,
         code: Int,
         flags: Int,
-        callingUid: Int,
-        callingPid: Int,
+        ctx: CallerInfo,
         data: Parcel,
         reply: Parcel?,
         resultCode: Int
     ): Result {
+        val callingUid = ctx.callingUid.toInt()
+        val callingPid = ctx.callingPid.toInt()
         if (target != keystore || code != getTransaction || reply == null) return Skip
         if (kotlin.runCatching { reply.readException() }.exceptionOrNull() != null) return Skip
         val p = Parcel.obtain()

@@ -1,5 +1,4 @@
 import android.databinding.tool.ext.capitalizeUS
-import org.gradle.kotlin.dsl.register
 import org.jetbrains.kotlin.daemon.common.toHexString
 import java.security.MessageDigest
 
@@ -31,7 +30,7 @@ fun calculateChecksum(variantLowered: String): String {
 
 android {
     namespace = "io.github.a13e300.tricky_store"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.a13e300.tricky_store"
@@ -74,6 +73,7 @@ android {
     }
 
     buildFeatures {
+        aidl = true
         buildConfig = true
     }
 

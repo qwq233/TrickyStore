@@ -4,6 +4,7 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
 import io.github.a13e300.tricky_store.Logger
+import top.qwq2333.ohmykeymint.CallerInfo
 
 open class BinderInterceptor : Binder() {
     sealed class Result
@@ -41,8 +42,8 @@ open class BinderInterceptor : Binder() {
         }
     }
 
-    open fun onPreTransact(target: IBinder, code: Int, flags: Int, callingUid: Int, callingPid: Int, data: Parcel): Result = Skip
-    open fun onPostTransact(target: IBinder, code: Int, flags: Int, callingUid: Int, callingPid: Int, data: Parcel, reply: Parcel?, resultCode: Int): Result = Skip
+    open fun onPreTransact(target: IBinder, code: Int, flags: Int, ctx: CallerInfo, data: Parcel): Result = Skip
+    open fun onPostTransact(target: IBinder, code: Int, flags: Int, ctx: CallerInfo, data: Parcel, reply: Parcel?, resultCode: Int): Result = Skip
 
     override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
         val result = when (code) {
@@ -51,13 +52,21 @@ open class BinderInterceptor : Binder() {
                 val theCode = data.readInt()
                 val theFlags = data.readInt()
                 val callingUid = data.readInt()
+//                val _callingSid = data.readString()
                 val callingPid = data.readInt()
                 val sz = data.readLong()
                 val theData = Parcel.obtain()
                 try {
                     theData.appendFrom(data, data.dataPosition(), sz.toInt())
                     theData.setDataPosition(0)
-                    onPreTransact(target, theCode, theFlags, callingUid, callingPid, theData)
+
+                    val ctx = CallerInfo().apply {
+                        this.callingUid = callingUid.toLong()
+                        this.callingPid = callingPid.toLong()
+                        this.callingSid = callingSid
+                    }
+
+                    onPreTransact(target, theCode, theFlags, ctx, theData)
                 } finally {
                     theData.recycle()
                 }
@@ -67,6 +76,7 @@ open class BinderInterceptor : Binder() {
                 val theCode = data.readInt()
                 val theFlags = data.readInt()
                 val callingUid = data.readInt()
+                val callingSid = data.readString()
                 val callingPid = data.readInt()
                 val resultCode = data.readInt()
                 val theData = Parcel.obtain()
@@ -81,7 +91,14 @@ open class BinderInterceptor : Binder() {
                         theReply.appendFrom(data, data.dataPosition(), sz2)
                         theReply.setDataPosition(0)
                     }
-                    onPostTransact(target, theCode, theFlags, callingUid, callingPid, theData, if (sz2 == 0) null else theReply, resultCode)
+
+                    val ctx = CallerInfo().apply {
+                        this.callingUid = callingUid.toLong()
+                        this.callingPid = callingPid.toLong()
+                        this.callingSid = callingSid
+                    }
+
+                    onPostTransact(target, theCode, theFlags, ctx, theData, if (sz2 == 0) null else theReply, resultCode)
                 } finally {
                     theData.recycle()
                     theReply.recycle()

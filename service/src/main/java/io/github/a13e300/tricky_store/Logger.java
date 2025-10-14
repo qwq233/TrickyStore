@@ -24,6 +24,10 @@ public class Logger {
         Log.e(TAG, "wtf: " + msg, t);
     }
 
+    public static void e(String tag, String msg, Throwable t) {
+        Log.e(TAG, tag + ": " + msg, t);
+    }
+
     public static void i(String msg) {
         Log.i(TAG, msg);
     }

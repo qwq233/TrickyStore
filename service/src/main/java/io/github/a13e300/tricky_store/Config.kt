@@ -18,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import top.qwq2333.ohmykeymint.IOhMyKsService
+import top.qwq2333.ohmykeymint.IOhMySecurityLevel
 import java.io.File
 
 object Config {
@@ -121,6 +123,28 @@ object Config {
             iPm = IPackageManager.Stub.asInterface(binder)
         }
         return iPm
+    }
+
+    private var omk: IOhMyKsService? = null
+
+    private val omkDeathRecipient = object : IBinder.DeathRecipient {
+        override fun binderDied() {
+            (omk as? IInterface)?.asBinder()?.unlinkToDeath(this, 0)
+            omk = null
+        }
+    }
+
+    fun getOmk(): IOhMyKsService? {
+        if (omk == null) {
+            val binder = ServiceManager.getService("omk") ?: return null
+            binder.linkToDeath(omkDeathRecipient, 0)
+            omk = IOhMyKsService.Stub.asInterface(binder)
+        }
+        return omk
+    }
+
+    fun getOhMySecurityLevel(securityLevel: Int): IOhMySecurityLevel? {
+        return getOmk()?.getOhMySecurityLevel(securityLevel)
     }
 
     fun needHack(callingUid: Int) = kotlin.runCatching {

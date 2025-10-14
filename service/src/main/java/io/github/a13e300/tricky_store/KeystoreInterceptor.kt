@@ -8,12 +8,11 @@ import android.os.ServiceManager
 import android.os.ServiceSpecificException
 import android.system.keystore2.IKeystoreService
 import android.system.keystore2.KeyDescriptor
-import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.ResponseCode
 import io.github.a13e300.tricky_store.Cache.Key
+import io.github.a13e300.tricky_store.Config.getOmk
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
-import io.github.a13e300.tricky_store.keystore.CertHack
-import io.github.a13e300.tricky_store.keystore.Utils
+import top.qwq2333.ohmykeymint.CallerInfo
 import java.security.cert.CertificateFactory
 import kotlin.system.exitProcess
 
@@ -37,16 +36,30 @@ object KeystoreInterceptor : BinderInterceptor() {
         target: IBinder,
         code: Int,
         flags: Int,
-        callingUid: Int,
-        callingPid: Int,
+        ctx: CallerInfo,
         data: Parcel
     ): Result {
+        val callingUid = ctx.callingUid.toInt()
+        val callingPid = ctx.callingPid.toInt()
         if (!Config.needGenerate(callingUid)) return Skip
+        val omk = getOmk()
         Logger.d("KeystoreInceptor onPreTransact code=$code")
         when (code) {
+            getSecurityLevelTransaction -> {
+                omk ?: return Skip
+
+                val level = data.readInt()
+
+                Parcel.obtain().apply {
+                    writeNoException()
+                    writeStrongBinder(omk.getSecurityLevel(level).asBinder())
+                }.run {
+                    return OverrideReply(0, this)
+                }
+            }
             getKeyEntryTransaction -> {
                 Logger.d("KeystoreInceptor getKeyEntryTransaction pre $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
-                if (CertHack.canHack()) {
+                if (Config.needGenerate(callingUid))
                     runCatching {
                         data.enforceInterface(IKeystoreService.DESCRIPTOR)
                         if (!Config.isGenerateKeyEnabled(callingUid)) {
@@ -55,9 +68,19 @@ object KeystoreInterceptor : BinderInterceptor() {
                         }
 
                         val descriptor =
-                            data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
-                        val response =
+                            data.readTypedObject(KeyDescriptor.CREATOR)
+
+                        if (descriptor == null) {
+                            Logger.d("descriptor is null, skipping")
+                            return Skip
+                        }
+
+                        val response = if (omk != null) {
+                            omk.getKeyEntry(ctx, descriptor)
+                        } else {
                             Cache.getKeyResponse(callingUid, descriptor.alias)
+                        }
+
                         val p = Parcel.obtain()
                         if (response != null) {
                             Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
@@ -74,9 +97,9 @@ object KeystoreInterceptor : BinderInterceptor() {
                         }
 
                         return OverrideReply(0, p)
+                    }.onFailure {
+                        Logger.e("", it)
                     }
-                    return Skip
-                }
             }
 
             updateSubcomponentTransaction -> {
@@ -91,6 +114,21 @@ object KeystoreInterceptor : BinderInterceptor() {
                         data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                     val publicCert = data.createByteArray()
                     val certificateChain = data.createByteArray()
+
+                    if (omk != null) {
+                        omk.updateSubcomponent(
+                            ctx,
+                            descriptor,
+                            publicCert,
+                            certificateChain
+                        )
+
+                        Parcel.obtain().apply {
+                            writeNoException()
+                        }.run {
+                            return OverrideReply(0, this)
+                        }
+                    }
 
                     if (certificateChain != null) {
                         Logger.d("updateSubcomponent certificateChain sz=${certificateChain.size}")
@@ -113,8 +151,17 @@ object KeystoreInterceptor : BinderInterceptor() {
             deleteKeyTransaction -> {
                 Logger.d("KeystoreInceptor onPreTransact deleteKeyTransaction uid=$callingUid pid=$callingPid")
                 data.enforceInterface("android.system.keystore2.IKeystoreService")
-                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
-                if (keyDescriptor == null) return Skip
+                val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
+
+                if (omk != null) {
+                    omk.deleteKey(ctx, keyDescriptor)
+
+                    Parcel.obtain().apply {
+                        writeNoException()
+                    }.run {
+                        return OverrideReply(0, this)
+                    }
+                }
 
                 Logger.d("KeystoreInterceptor deleteKey uid=$callingUid alias=${keyDescriptor.alias}")
 
@@ -123,62 +170,6 @@ object KeystoreInterceptor : BinderInterceptor() {
 
                 return Skip
             }
-        }
-        return Skip
-    }
-
-    override fun onPostTransact(
-        target: IBinder,
-        code: Int,
-        flags: Int,
-        callingUid: Int,
-        callingPid: Int,
-        data: Parcel,
-        reply: Parcel?,
-        resultCode: Int
-    ): Result {
-        if (target != keystore || reply == null) return Skip
-        if (kotlin.runCatching { reply.readException() }.exceptionOrNull() != null) return Skip
-        val p = Parcel.obtain()
-        Logger.d("intercept post $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()} replySz=${reply.dataSize()}")
-
-        if (code == deleteKeyTransaction && resultCode == 0) {
-            data.enforceInterface("android.system.keystore2.IKeystoreService")
-            val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
-            if (keyDescriptor == null || keyDescriptor.domain == 0) return Skip
-
-            Logger.d("KeystoreInterceptor deleteKey uid=$callingUid alias=${keyDescriptor.alias}")
-
-            Cache.deleteKey(Key(callingUid, keyDescriptor.alias))
-            Cache.deleteImportedKey(callingUid, callingPid)
-
-            return Skip
-        } else if (code == getKeyEntryTransaction) {
-            Logger.d("KeystoreInterceptor intercept getKeyEntry uid=$callingUid pid=$callingPid")
-            try {
-                data.enforceInterface("android.system.keystore2.IKeystoreService")
-                if (!Config.isGenerateKeyEnabled(callingUid)) {
-                    Logger.d("getKeyEntry feature disabled for $callingUid")
-                    return Skip
-                }
-                val response = reply.readTypedObject(KeyEntryResponse.CREATOR)
-                val chain = Utils.getCertificateChain(response)
-                if (chain != null) {
-                    val newChain = CertHack.hackCertificateChain(chain)
-                    Utils.putCertificateChain(response, newChain)
-                    Logger.i("hacked cert of uid=$callingUid")
-                    p.writeNoException()
-                    p.writeTypedObject(response, 0)
-                    return OverrideReply(0, p)
-                } else {
-                    p.recycle()
-                }
-            } catch (t: Throwable) {
-                Logger.e("failed to hack certificate chain of uid=$callingUid pid=$callingPid!", t)
-                p.recycle()
-            }
-        } else if (code == updateSubcomponentTransaction) {
-            Logger.d("onPostTransact updateSubcomponent uid=$callingUid pid=$callingPid")
         }
         return Skip
     }

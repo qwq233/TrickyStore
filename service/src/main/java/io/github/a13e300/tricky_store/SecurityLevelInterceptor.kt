@@ -6,6 +6,7 @@ import android.hardware.security.keymint.KeyParameterValue
 import android.hardware.security.keymint.Tag
 import android.os.IBinder
 import android.os.Parcel
+import android.system.keystore2.AuthenticatorSpec
 import android.system.keystore2.Authorization
 import android.system.keystore2.CreateOperationResponse
 import android.system.keystore2.IKeystoreOperation
@@ -13,9 +14,11 @@ import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyDescriptor
 import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
+import io.github.a13e300.tricky_store.Config.getOhMySecurityLevel
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
 import io.github.a13e300.tricky_store.keystore.Utils
+import top.qwq2333.ohmykeymint.CallerInfo
 import java.security.KeyFactory
 import java.security.PrivateKey
 import java.security.Signature
@@ -39,10 +42,14 @@ class SecurityLevelInterceptor(
     }
 
     override fun onPreTransact(
-        target: IBinder, code: Int, flags: Int, callingUid: Int, callingPid: Int, data: Parcel
+        target: IBinder, code: Int, flags: Int, ctx: CallerInfo, data: Parcel
     ): Result {
+        val callingUid = ctx.callingUid.toInt()
+        val callingPid = ctx.callingPid.toInt()
         Logger.d("SecurityLevelInterceptor received onPreTransact code=$code uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
         if (!Config.needGenerate(callingUid)) return Skip
+        val securityLevel = getOhMySecurityLevel(level)
+
         when (code) {
             generateKeyTransaction -> runCatching {
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
@@ -52,25 +59,37 @@ class SecurityLevelInterceptor(
                     return Skip
                 }
 
-
                 val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                 val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
-                data.readInt()
-                data.createByteArray()
-                val kgp = CertHack.KeyGenParameters(params)
-                // Logger.e("warn: attestation key not supported now")
-                val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp) ?: return@runCatching
-                val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
-                Cache.putKey(callingUid, keyDescriptor.alias, pair.first, pair.second, response)
+                val flags = data.readInt()
+                val entropy = data.createByteArray()!!
+
+                val response = if (securityLevel != null) {
+                    securityLevel.generateKey(
+                        ctx,
+                        keyDescriptor,
+                        attestationKeyDescriptor,
+                        params,
+                        flags,
+                        entropy
+                    )
+                } else {
+                    val kgp = CertHack.KeyGenParameters(params)
+                    // Logger.e("warn: attestation key not supported now")
+                    val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp) ?: return@runCatching
+                    val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
+                    Cache.putKey(callingUid, keyDescriptor.alias, pair.first, pair.second, response)
+                    response.metadata
+                }
+
                 val p = Parcel.obtain()
                 p.writeNoException()
-                p.writeTypedObject(response.metadata, 0)
+                p.writeTypedObject(response, 0)
                 return OverrideReply(0, p)
             }.onFailure {
                 Logger.e("parse key gen request", it)
             }
-
 
             importKeyTransaction -> runCatching {
                 data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
@@ -82,8 +101,24 @@ class SecurityLevelInterceptor(
                 val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                 val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
-                data.readInt()
+                val flags = data.readInt()
                 val keyData = data.createByteArray() // pkcs8 format raw key bits
+
+                if (securityLevel != null) {
+                    val response = securityLevel.importKey(
+                        ctx,
+                        keyDescriptor,
+                        attestationKeyDescriptor,
+                        params,
+                        flags,
+                        keyData
+                    )
+
+                    val p = Parcel.obtain()
+                    p.writeNoException()
+                    p.writeTypedObject(response, 0)
+                    return OverrideReply(0, p)
+                }
 
                 val kgp = CertHack.KeyGenParameters(params)
                 if (!kgp.purpose.any { it == 2 /* sign */ || it == 7 /* attest */ }) {
@@ -132,7 +167,22 @@ class SecurityLevelInterceptor(
 
                 val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
                 val params = data.createTypedArray(KeyParameter.CREATOR) ?: return Skip
+                val force = data.readBoolean()
                 val kgp = CertHack.KeyGenParameters(params)
+
+                if (securityLevel != null) {
+                    val response = securityLevel.createOperation(
+                        ctx,
+                        keyDescriptor,
+                        params,
+                        force
+                    )
+
+                    val p = Parcel.obtain()
+                    p.writeNoException()
+                    p.writeTypedObject(response, 0)
+                    return OverrideReply(0, p)
+                }
 
                 if (keyDescriptor.domain != 4) throw IllegalArgumentException("unsupported domain ${keyDescriptor.domain}")
                 kgp.purpose.any { it == 2 /* sign */ || it == 7 /* attest */ } ||
@@ -171,6 +221,36 @@ class SecurityLevelInterceptor(
                 return OverrideReply(0, parcel)
             }.onFailure {
                 Logger.e("", it)
+            }
+
+            importWrappedKeyTransaction -> runCatching {
+                data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
+                if (!Config.isImportKeyEnabled(callingUid)) {
+                    Logger.d("importKey feature disabled for $callingUid")
+                    return Skip
+                }
+
+                val key = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
+                val wrappingKey = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
+                val maskingKey = data.createByteArray()
+                val params = data.createTypedArray(KeyParameter.CREATOR) ?: return Skip
+                val authenticators = data.createTypedArray(AuthenticatorSpec.CREATOR) ?: return Skip
+
+                if (securityLevel != null) {
+                    val response = securityLevel.importWrappedKey(
+                        ctx,
+                        key,
+                        wrappingKey,
+                        maskingKey,
+                        params,
+                        authenticators
+                    )
+
+                    val p = Parcel.obtain()
+                    p.writeNoException()
+                    p.writeTypedObject(response, 0)
+                    return OverrideReply(0, p)
+                }
             }
         }
         return Skip
