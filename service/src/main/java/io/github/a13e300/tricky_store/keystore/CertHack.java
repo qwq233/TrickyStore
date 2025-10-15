@@ -58,6 +58,7 @@ import java.security.spec.ECGenParameterSpec;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -75,6 +76,7 @@ import io.github.a13e300.tricky_store.Cache;
 import io.github.a13e300.tricky_store.Config;
 import io.github.a13e300.tricky_store.Logger;
 import io.github.a13e300.tricky_store.UtilKt;
+import top.qwq2333.ohmykeymint.IOhMyKsService;
 
 public final class CertHack {
     private static final ASN1ObjectIdentifier OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17");
@@ -124,7 +126,7 @@ public final class CertHack {
         return derOctectString.getOctets();
     }
 
-    public static void readFromXml(String data) {
+    public static void readFromXml(String data, IOhMyKsService omk) {
         keyboxes.clear();
         if (data == null) {
             Logger.i("clear all keyboxes");
@@ -159,6 +161,37 @@ public final class CertHack {
                 var pemKp = parseKeyPair(privateKey);
                 var kp = new JcaPEMKeyConverter().getKeyPair(pemKp);
                 keyboxes.put(algo, new KeyBox(pemKp, kp, certificateChain));
+
+                if (omk != null) {
+                    try {
+                        if (keyboxAlgorithm.equalsIgnoreCase("ecdsa")) {
+                            ArrayList<android.hardware.security.keymint.Certificate> list = new ArrayList<>();
+
+                            for (int j = 0; j < numberOfCertificates; j++) {
+                                Map<String, String> certData = xmlParser.obtainPath(
+                                        "AndroidAttestation.Keybox.Key[" + i + "].CertificateChain.Certificate[" + j + "]");
+                                var cert = new android.hardware.security.keymint.Certificate();
+                                cert.encodedCertificate = Base64.getDecoder().decode(UtilKt.parsePemToBase64(certData.get("text")));
+                                list.add(cert);
+                            }
+
+                            omk.updateEcKeybox(Base64.getDecoder().decode(UtilKt.parsePemToBase64(privateKey)), list);
+                        } else if (keyboxAlgorithm.equalsIgnoreCase("rsa")) {
+                            ArrayList<android.hardware.security.keymint.Certificate> list = new ArrayList<>();
+                            for (int j = 0; j < numberOfCertificates; j++) {
+                                Map<String, String> certData = xmlParser.obtainPath(
+                                        "AndroidAttestation.Keybox.Key[" + i + "].CertificateChain.Certificate[" + j + "]");
+                                var cert = new android.hardware.security.keymint.Certificate();
+                                cert.encodedCertificate = Base64.getDecoder().decode(UtilKt.parsePemToBase64(certData.get("text")));
+                                list.add(cert);
+                            }
+
+                            omk.updateRsaKeybox(Base64.getDecoder().decode(UtilKt.parsePemToBase64(privateKey)), list);
+                        }
+                    } catch (Exception e) {
+                        Logger.e("Unable to update keybox to OMK", e);
+                    }
+                }
             }
             Logger.i("update " + numberOfKeyboxes + " keyboxes");
         } catch (Throwable t) {

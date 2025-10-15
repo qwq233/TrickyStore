@@ -126,6 +126,17 @@ fun String.toDER() = DEROctetString(this.toByteArray())
 fun DEROctetString.toTaggedObj(tag: Int, explicit: Boolean = true) = DERTaggedObject(explicit, tag, this)
 fun String.trimLine() = trim().split("\n").joinToString("\n") { it.trim() }
 
+const val BEGIN = "-----BEGIN.*?-----"
+const val END = "-----END.*?-----"
+
+fun parsePemToBase64(str: String): String {
+    val result = str.trimLine()
+        .replace(BEGIN.toRegex(RegexOption.MULTILINE), "")
+        .replace(END.toRegex(RegexOption.MULTILINE), "")
+        .replace("\n", "")
+    return result
+}
+
 fun Parcelable.toBytes(): ByteArray {
     val p = Parcel.obtain()
     return try {

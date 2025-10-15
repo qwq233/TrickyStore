@@ -43,7 +43,7 @@ object Config {
     }
 
     private fun updateKeyBox(f: File?) = runCatching {
-        CertHack.readFromXml(f?.readText())
+        CertHack.readFromXml(f?.readText(), getOmk())
     }.onFailure {
         Logger.e("failed to update keybox", it)
     }
@@ -129,6 +129,7 @@ object Config {
 
     private val omkDeathRecipient = object : IBinder.DeathRecipient {
         override fun binderDied() {
+            Logger.e("OMK process exited. Reset OMK to null.")
             (omk as? IInterface)?.asBinder()?.unlinkToDeath(this, 0)
             omk = null
         }
@@ -139,6 +140,7 @@ object Config {
             val binder = ServiceManager.getService("omk") ?: return null
             binder.linkToDeath(omkDeathRecipient, 0)
             omk = IOhMyKsService.Stub.asInterface(binder)
+            updateKeyBox(File(root, KEYBOX_FILE))
         }
         return omk
     }

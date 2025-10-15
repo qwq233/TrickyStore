@@ -45,18 +45,18 @@ object KeystoreInterceptor : BinderInterceptor() {
         val omk = getOmk()
         Logger.d("KeystoreInceptor onPreTransact code=$code")
         when (code) {
-            getSecurityLevelTransaction -> {
-                omk ?: return Skip
+            /*            getSecurityLevelTransaction -> {
+                            omk ?: return Skip
 
-                val level = data.readInt()
+                            val level = data.readInt()
 
-                Parcel.obtain().apply {
-                    writeNoException()
-                    writeStrongBinder(omk.getSecurityLevel(level).asBinder())
-                }.run {
-                    return OverrideReply(0, this)
-                }
-            }
+                            Parcel.obtain().apply {
+                                writeNoException()
+                                writeStrongBinder(omk.getSecurityLevel(level).asBinder())
+                            }.run {
+                                return OverrideReply(0, this)
+                            }
+                        }*/
             getKeyEntryTransaction -> {
                 Logger.d("KeystoreInceptor getKeyEntryTransaction pre $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()}")
                 if (Config.needGenerate(callingUid))
