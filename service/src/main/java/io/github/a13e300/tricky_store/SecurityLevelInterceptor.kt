@@ -252,6 +252,19 @@ class SecurityLevelInterceptor(
                     return OverrideReply(0, p)
                 }
             }
+
+            deleteKeyTransaction -> runCatching {
+                data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
+                val key = data.readTypedObject(KeyDescriptor.CREATOR) ?: return Skip
+
+                if (securityLevel != null) {
+                    securityLevel.deleteKey(key)
+
+                    val p = Parcel.obtain()
+                    p.writeNoException()
+                    return OverrideReply(0, p)
+                }
+            }
         }
         return Skip
     }

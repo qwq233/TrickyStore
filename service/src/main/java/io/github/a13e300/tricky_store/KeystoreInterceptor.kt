@@ -75,19 +75,31 @@ object KeystoreInterceptor : BinderInterceptor() {
                             return Skip
                         }
 
-                        val response = if (omk != null) {
-                            omk.getKeyEntry(ctx, descriptor)
-                        } else {
-                            Cache.getKeyResponse(callingUid, descriptor.alias)
+                        val p = Parcel.obtain()
+
+                        if (omk != null) {
+                            val response = omk.getKeyEntry(ctx, descriptor)
+                            p.writeNoException()
+                            p.writeTypedObject(response, 0)
+                            return OverrideReply(0, p)
                         }
 
-                        val p = Parcel.obtain()
+                        val response =
+                            Cache.getKeyResponse(callingUid, descriptor.alias)
+
                         if (response != null) {
                             Logger.i("generate key for uid=$callingUid alias=${descriptor.alias}")
                             p.writeNoException()
                             p.writeTypedObject(response, 0)
                         } else {
                             Logger.d("key not found for uid=$callingUid alias=${descriptor.alias}")
+                            // We skip system uid requests because tricky store obviously does not store every keys
+                            // and it may cause issues with system services expecting certain keys to be present.
+                            // like lockscreen keys.
+                            if (callingUid == 1000) {
+                                Logger.d("system uid requesting generated key alias=${descriptor.alias}")
+                                return Skip
+                            }
                             p.writeException(
                                 ServiceSpecificException(
                                     ResponseCode.KEY_NOT_FOUND,

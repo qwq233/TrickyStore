@@ -75,7 +75,7 @@ open class BinderInterceptor : Binder() {
                 val theCode = data.readInt()
                 val theFlags = data.readInt()
                 val callingUid = data.readInt()
-                val callingSid = data.readString()
+                // val callingSid = data.readString()
                 val callingPid = data.readInt()
                 val resultCode = data.readInt()
                 val theData = Parcel.obtain()
@@ -94,7 +94,7 @@ open class BinderInterceptor : Binder() {
                     val ctx = CallerInfo().apply {
                         this.callingUid = callingUid.toLong()
                         this.callingPid = callingPid.toLong()
-                        this.callingSid = callingSid
+                        this.callingSid = "reserved"
                     }
 
                     onPostTransact(target, theCode, theFlags, ctx, theData, if (sz2 == 0) null else theReply, resultCode)
