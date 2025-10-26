@@ -32,6 +32,14 @@
 -keep class org.bouncycastle.jce.provider.** { *; }
 -dontwarn javax.naming.**
 
+-keep class android.** { *; }
+-keep class com.android.** { *; }
+-keep class top.qwq2333.ohmykeymint.** { *; }
+
+-keepclassmembers class * {
+    static final int TRANSACTION_*;
+}
+
 # Keep `Companion` object fields of serializable classes.
 # This avoids serializer lookup through `getDeclaredClasses` as done for named companion objects.
 -if @kotlinx.serialization.Serializable class **
