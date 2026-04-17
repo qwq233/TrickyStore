@@ -2,7 +2,7 @@
 agp = "8.11.0"
 bcpkix-jdk18on = "1.81"
 kotlin = "2.2.0"
-ktoml = "0.7.0"
+ktoml = "0.7.1"
 hidden-api = "4.4.0"
 annotation = "1.9.1"
 kotlinxCoroutinesAndroid = "1.10.2"
