@@ -21,4 +21,4 @@ agp-app = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin"}
-lsplugin-cmaker = { id = "org.lsposed.lsplugin.cmaker", version = "1.2" }
+lsplugin-cmaker = { id = "org.lsposed.lsplugin.cmaker", version = "1.4" }
