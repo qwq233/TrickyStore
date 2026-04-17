@@ -4,7 +4,7 @@ bcpkix-jdk18on = "1.81"
 kotlin = "2.2.0"
 ktoml = "0.7.0"
 hidden-api = "4.4.0"
-annotation = "1.9.1"
+annotation = "1.10.0"
 kotlinxCoroutinesAndroid = "1.10.2"
 
 [libraries]
